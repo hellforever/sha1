@@ -42,18 +42,18 @@ public:
     CPPUNIT_TEST( Sha1_test1 );
     CPPUNIT_TEST( Sha1_File_test1 );
     CPPUNIT_TEST( Hmac_Sha1_test1 );
-	CPPUNIT_TEST( Hmac_Sha1_test2 );
-	CPPUNIT_TEST( Hmac_Sha1_test3 );
+    CPPUNIT_TEST( Hmac_Sha1_test2 );
+    CPPUNIT_TEST( Hmac_Sha1_test3 );
     CPPUNIT_TEST_SUITE_END();
 
     void Sha1_Concat_test1();
     void Sha1_Concat_test2();
     void Sha1_Concat_test3();
-	void Sha1_test1();
+    void Sha1_test1();
     void Sha1_File_test1();
     void Hmac_Sha1_test1();
     void Hmac_Sha1_test2();
-	void Hmac_Sha1_test3();
+    void Hmac_Sha1_test3();
 
 };
 
