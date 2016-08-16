@@ -3,7 +3,7 @@
  *
  * Copyright (c)  2016 Anders Nordenfelt
  *
- * DATED: 2016-08-13
+ * DATED: 2016-08-16
  *
  * CONTENT: Implements the SHA1 hash algorithm and its corresponding HMAC-SHA1 function in accordance with the 
  *          NIST specifications (FIPS PUB 180-4) and (FIPS PUB 198-1).
@@ -24,6 +24,12 @@
 #define HASH_SIZE 5         /* defines the size of the hash in number of 32-bit INTEGERS                */
 #define DELIMITER 128       /* defines the unsigned char representation of the bit sequence '10000000'  */
 
+/* MACROS */
+
+#define Rot_Left(t, x) (((x) << t) | ((x) >> (32 - t)))
+#define Ch(x, y, z) ((x & y) ^ (~x & z))
+#define Parity(x, y, z) (x ^ y ^ z)
+#define Maj(x, y, z) ((x & y) ^ (x & z) ^ (y & z))
 
 /***************************************************************************************************************************************
  *
@@ -104,8 +110,6 @@ void Move_Forward_One_Word(struct sha1_word_pointer *p)
                 i++;
             }
         }
-        /* Convert the word to a 32-bit integer and store the result */
-        p->uint_rep = (p->word[0] << 24) | (p->word[1] << 16) | (p->word[2] << 8) | p->word[3];
     }
     else /* Perform the following for a file */
     {
@@ -139,9 +143,9 @@ void Move_Forward_One_Word(struct sha1_word_pointer *p)
                 i++;
             }
         }
-        /* Convert the word to a 32-bit integer and store the result */
-        p->uint_rep = (p->word[0] << 24) | (p->word[1] << 16) | (p->word[2] << 8) | p->word[3];
     }
+    /* Convert the word to a 32-bit integer and store the result */
+    p->uint_rep = ((uint32_t) p->word[0] << 24) | ((uint32_t) p->word[1] << 16) | ((uint32_t) p->word[2] << 8) | p->word[3];
 }
 
 /*------------------------------------------------------------------------------------------------------------------------------*/
@@ -200,7 +204,8 @@ void Set_Pad(struct sha1_word_pointer *p, unsigned char *pad, uint64_t text_byte
  *
  **************************************************************************************************************************************/
 
-/*The function Conv_Int_To_Word takes an integer argument and saves it as a four-byte char array starting at the position specified by the pointer a.                                                                                                                     */
+/* The function Conv_Int_To_Word takes a 32-bit integer argument and saves it as a four-byte char array 
+   starting at the position specified by the pointer a.                                               */
 
 
 void Conv_Int_To_Word(uint32_t i, char *a)
@@ -211,39 +216,6 @@ void Conv_Int_To_Word(uint32_t i, char *a)
     a[3] = i & 255;
 }
 
-/*------------------------------------------------------------------------------------------------------------------------------*/
-
-/* The function Rot_Left takes an integer x as argument and performs a bitwise rotation t steps to the left.                    */
-
-
-uint32_t Rot_Left(uint32_t t, uint32_t x)
-{
-    return (x << t) | (x >> (32 - t));
-}
-
-/*------------------------------------------------------------------------------------------------------------------------------*/
-
-/* The function f is used in the SHA1 hash iteration function. See the NIST documentation (FIPS PUB 180-4) for details.	        */
-
-
-uint32_t f(unsigned int t, uint32_t x, uint32_t y, uint32_t z)
-{
-    uint32_t result = 0;
-
-    if (t <= 19)
-    result = (x & y) ^ (~x & z);
-
-    else if (t >= 20 && t <= 39)
-    result = x ^ y ^ z;
-
-    else if (t >= 40 && t <= 59)
-    result = (x & y) ^ (x & z) ^ (y & z);
-
-    else if (t >= 60 && t <= 79)
-    result = x ^ y ^ z;
-
-    return result;
-}
 
 /***************************************************************************************************************************************
  * 
@@ -252,10 +224,10 @@ uint32_t f(unsigned int t, uint32_t x, uint32_t y, uint32_t z)
  **************************************************************************************************************************************/
 
 
-/* The function Sha1_Iterate_Hash implements the SHA1 hash iteration function. See the NIST documentation (FIPS PUB 180-4) for details. */
+/* The function SHA1_Iterate_Hash implements the SHA1 hash iteration function. See the NIST documentation (FIPS PUB 180-4) for details. */
 
 
-void Sha1_Iterate_Hash(struct sha1_word_pointer *p, uint32_t *H)
+void SHA1_Iterate_Hash(struct sha1_word_pointer *p, uint32_t *H)
 {
     const unsigned int K[] = {0x5a827999, 0x5a827999, 0x5a827999, 0x5a827999,   /* SHA1 constant vector */
                               0x5a827999, 0x5a827999, 0x5a827999, 0x5a827999,
@@ -296,9 +268,39 @@ void Sha1_Iterate_Hash(struct sha1_word_pointer *p, uint32_t *H)
     d = H[3];
     e = H[4];
 
-    for (i = 0; i < 80; i++)
+    for (i = 0; i < 20; i++)
     {
-        T = Rot_Left(5, a) + f(i, b, c, d) + e + K[i] + W[i];
+        T = Rot_Left(5, a) + Ch(b, c, d) + e + K[i] + W[i];
+        e = d;
+        d = c;
+        c = Rot_Left(30, b);
+        b = a;
+        a = T;
+    }
+
+    for (i = 20; i < 40; i++)
+    {
+        T = Rot_Left(5, a) + Parity(b, c, d) + e + K[i] + W[i];
+        e = d;
+        d = c;
+        c = Rot_Left(30, b);
+        b = a;
+        a = T;
+    }
+
+    for (i = 40; i < 60; i++)
+    {
+        T = Rot_Left(5, a) + Maj(b, c, d) + e + K[i] + W[i];
+        e = d;
+        d = c;
+        c = Rot_Left(30, b);
+        b = a;
+        a = T;
+    }
+
+    for (i = 60; i < 80; i++)
+    {
+        T = Rot_Left(5, a) + Parity(b, c, d) + e + K[i] + W[i];
         e = d;
         d = c;
         c = Rot_Left(30, b);
@@ -312,9 +314,10 @@ void Sha1_Iterate_Hash(struct sha1_word_pointer *p, uint32_t *H)
     H[3] = d + H[3];
     H[4] = e + H[4];
 }
+
 /*------------------------------------------------------------------------------------------------------------------------------*/
 
-void Sha1_Compute(struct sha1_word_pointer *p, uint32_t *hash)
+void SHA1_Compute(struct sha1_word_pointer *p, uint32_t *hash)
 {
     
     const uint32_t H_init[] = {0x67452301,       /* Initial SHA1 hash vector */
@@ -322,7 +325,6 @@ void Sha1_Compute(struct sha1_word_pointer *p, uint32_t *hash)
                                0x98badcfe,
                                0x10325476,
                                0xc3d2e1f0};  
-
     uint32_t H[HASH_SIZE];
     uint64_t N;
     int i;
@@ -338,7 +340,7 @@ void Sha1_Compute(struct sha1_word_pointer *p, uint32_t *hash)
 
     N = p->tot_byte_size/BLOCK_SIZE;
     for (i = 0; i < N; i++)
-        Sha1_Iterate_Hash(p, H);
+        SHA1_Iterate_Hash(p, H);
 
     /* Store final hash */
 
@@ -348,7 +350,7 @@ void Sha1_Compute(struct sha1_word_pointer *p, uint32_t *hash)
 
 /*********************************************************************************************************************************
  *
- * FUNCTION NAME: Sha1_Concat
+ * FUNCTION NAME: SHA1_Concat
  *
  * PURPOSE: Takes as an argument a collection of char arrays, performs a virtual concatenation of these arrays in their given order,
  *          performs the SHA1 algorithm on the concatenated array and stores the resulting hash.
@@ -357,7 +359,8 @@ void Sha1_Compute(struct sha1_word_pointer *p, uint32_t *hash)
  *
  * ARGUMENT            TYPE            I/O     DESCRIPTION
  * --------            ----            ---     -----------
- * strings             char**          I       the pointer to the char* array containing the pointers to the char arrays in the concatenation
+ * strings             char**          I       the pointer to the char* array containing the pointers to the char arrays 
+ *                                             to be hashed as a concatenation
  * nr_of_strings       uint64_t        I       the number of char arrays in the concatenation
  * strings_byte_size   uint64_t*       I       pointer to the uint64_t array containing the byte size of each char array 
  * hash                uint32_t*:      O       pointer to the uint32_t array where the resulting hash is to be stored
@@ -366,7 +369,7 @@ void Sha1_Compute(struct sha1_word_pointer *p, uint32_t *hash)
  *
  *********************************************************************************************************************************/
 
-void Sha1_Concat(char **strings, uint64_t nr_of_strings, uint64_t *strings_byte_size, uint32_t *hash)
+void SHA1_Concat(char **strings, uint64_t nr_of_strings, uint64_t *strings_byte_size, uint32_t *hash)
 {
     int i;                          
     uint64_t concat_byte_size;                   /* the size in bytes of the total string concatenation     */
@@ -389,12 +392,12 @@ void Sha1_Concat(char **strings, uint64_t nr_of_strings, uint64_t *strings_byte_
 
     /* Compute the hash */
 
-    Sha1_Compute(&p, hash);
+    SHA1_Compute(&p, hash);
 }
 
 /********************************************************************************************************************************
  *
- * FUNCTION NAME: Sha1
+ * FUNCTION NAME: SHA1
  *
  * PURPOSE: Takes as an argument a char array and computes its SHA1 hash
  *
@@ -410,16 +413,16 @@ void Sha1_Concat(char **strings, uint64_t nr_of_strings, uint64_t *strings_byte_
  *                                    
  *********************************************************************************************************************************/
 
-void Sha1(char *text, uint64_t text_byte_size, uint32_t *hash)
+void SHA1(char *text, uint64_t text_byte_size, uint32_t *hash)
 {
     uint64_t text_byte_size_[1];
     text_byte_size_[0] = text_byte_size;
-    Sha1_Concat(&text, 1, text_byte_size_, hash);
+    SHA1_Concat(&text, 1, text_byte_size_, hash);
 }
 
 /*******************************************************************************************************************************
  *
- * FUNCTION NAME: Sha1_File
+ * FUNCTION NAME: SHA1_File
  *
  * PURPOSE: Takes as an argument a file name and computes the SHA1 hash of its content
  *
@@ -434,7 +437,7 @@ void Sha1(char *text, uint64_t text_byte_size, uint32_t *hash)
  *
  *******************************************************************************************************************************/
 
-int Sha1_File(char *filename, uint32_t *hash)
+int SHA1_File(char *filename, uint32_t *hash)
 {
     int exit_status;                            /* exit status                          */
     FILE* fp;                                   /* pointer to the file to be hashed     */
@@ -461,13 +464,13 @@ int Sha1_File(char *filename, uint32_t *hash)
     p.fp = fp;
     p.file_byte_size = file_byte_size;
 
-    /* Prepare and set the pad */
+    /* Set the pad */
 
     Set_Pad(&p, pad, file_byte_size);
   
     /* Compute the hash */
 
-    Sha1_Compute(&p, hash);
+    SHA1_Compute(&p, hash);
 
     /* Return exit status */
 
@@ -479,7 +482,7 @@ int Sha1_File(char *filename, uint32_t *hash)
 
 /*******************************************************************************************************************************
  *
- * FUNCTION NAME: Hmac_Sha1
+ * FUNCTION NAME: HMAC_SHA1
  *
  * PURPOSE: Takes as an argument a string and a key and computes the corresponding HMAC-SHA1 digest
  *
@@ -493,11 +496,11 @@ int Sha1_File(char *filename, uint32_t *hash)
  * text_size           uint64_t        I       the byte size of the char array containing the text
  * hash                uint32_t*:      O       pointer to the uint32_t array where the resulting digest is to be stored
  *
- * RETURN VALUE : void	
+ * RETURN VALUE : void
  *
  *******************************************************************************************************************************/
 
-void Hmac_Sha1(char *key, unsigned int key_size, char *text, uint64_t text_size, uint32_t *digest)
+void HMAC_SHA1(char *key, unsigned int key_size, char *text, uint64_t text_size, uint32_t *digest)
 {
     int i;                                  /* internal counter variable                                    */
     char key0[BLOCK_SIZE];                  /* array to store the key adjusted to the block size            */
@@ -516,7 +519,7 @@ void Hmac_Sha1(char *key, unsigned int key_size, char *text, uint64_t text_size,
     if (key_size > BLOCK_SIZE)
     {
         uint32_t key_hash[HASH_SIZE];       /* array to store the hash of the key */
-        Sha1(key, key_size, key_hash);
+        SHA1(key, key_size, key_hash);
 
         for(i = 0; i < HASH_SIZE; i++)
             Conv_Int_To_Word(key_hash[i], &key0[i * WORD_SIZE]);
@@ -536,7 +539,7 @@ void Hmac_Sha1(char *key, unsigned int key_size, char *text, uint64_t text_size,
             key0[i] = 0;
     }
 
-    /* Procedure to add the ipad to the key, concatenate it with the text and hash the result */ 
+    /* Add the ipad to the key, concatenate it with the text and hash the result */ 
 
     for(i = 0; i < BLOCK_SIZE; i++)
         key0_xor_ipad[i] = key0[i] ^ 0x36;
@@ -546,14 +549,14 @@ void Hmac_Sha1(char *key, unsigned int key_size, char *text, uint64_t text_size,
     concat1_byte_size[0] = BLOCK_SIZE;
     concat1_byte_size[1] = text_size;
 
-    Sha1_Concat(concat1, 2, concat1_byte_size, hash1);
+    SHA1_Concat(concat1, 2, concat1_byte_size, hash1);
 
     /* Convert the intermediate hash to a char array */
 
     for(i = 0; i < HASH_SIZE; i++)
         Conv_Int_To_Word(hash1[i], &hash1_str[i * WORD_SIZE]);
 
-    /* Procedure to add the opad to the key, concatenate it with the intermediate hash and hash the result */
+    /* Add the opad to the key, concatenate it with the intermediate hash and hash the result */
 
     for(i = 0; i < BLOCK_SIZE; i++)
         key0_xor_opad[i] = key0[i] ^ 0x5c;
@@ -563,7 +566,7 @@ void Hmac_Sha1(char *key, unsigned int key_size, char *text, uint64_t text_size,
     concat2_byte_size[0] = BLOCK_SIZE;
     concat2_byte_size[1] = HASH_SIZE * WORD_SIZE;
 
-    Sha1_Concat(concat2, 2, concat2_byte_size, digest);
+    SHA1_Concat(concat2, 2, concat2_byte_size, digest);
 }
 
 
