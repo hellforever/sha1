@@ -31,14 +31,14 @@
 #define Parity(x, y, z) (x ^ y ^ z)
 #define Maj(x, y, z) ((x & y) ^ (x & z) ^ (y & z))
 
-/***************************************************************************************************************************************
+/************************************************************************************************************************************
  *
  * 	SECTION: DATA STRUCTURES AND ASSOCIATED METHODS
  *
- **************************************************************************************************************************************/
+ ***********************************************************************************************************************************/
 
-/* The sha1_word_pointer defines a pointer type that acts as a virtual concatenation between the char arrays to be hashed and the pad,
-   or alternatively the file to be hashed and the pad */ 
+/* The sha1_word_pointer defines a pointer type that acts as a virtual concatenation between the char arrays to be hashed 
+   and the pad, or alternatively the file to be hashed and the pad */ 
 
 struct sha1_word_pointer
 {
@@ -63,9 +63,10 @@ struct sha1_word_pointer
     int is_in_pad;                  /* specifies whether the pointer is in the pad or not                               */
 };
 
-/*------------------------------------------------------------------------------------------------------------------------------*/
+/*-----------------------------------------------------------------------------------------------------------------------------*/
 
-/* The function Move_Forward_One_Word advances the position of the word-pointer, loads a new word and saves its corresponding integer representation.                                                                                                                       */
+/* The function Move_Forward_One_Word advances the position of the word-pointer, loads a new word and saves its corresponding 
+   integer representation. */
 
 
 void Move_Forward_One_Word(struct sha1_word_pointer *p)
@@ -75,7 +76,7 @@ void Move_Forward_One_Word(struct sha1_word_pointer *p)
     if (p->fp == NULL)  /* Perform the following for a string concatenation */
     {
         /* Fast track if the position is not close to the edge of the current string */
-        if(p->array_position + 4 < p->strings_byte_size[p->array_index] && p->array_index < p->nr_of_strings)
+        if(p->array_index < p->nr_of_strings && p->array_position + 4 < p->strings_byte_size[p->array_index])
         {
             p->word[0] = (unsigned char) p->strings[p->array_index][p->array_position];
             p->word[1] = (unsigned char) p->strings[p->array_index][p->array_position + 1];
@@ -85,11 +86,11 @@ void Move_Forward_One_Word(struct sha1_word_pointer *p)
         }
         else
         {
-        i = 0;
+            i = 0;
             while (i < WORD_SIZE)
             {
                 /* If the pointer is still within a string, load the word with a byte from the string and move forward one byte*/
-                if (p->array_position < p->strings_byte_size[p->array_index] && p->array_index < p->nr_of_strings)
+                if (p->array_index < p->nr_of_strings && p->array_position < p->strings_byte_size[p->array_index])
                 {
                     p->word[i] = (unsigned char) p->strings[p->array_index][p->array_position];
                     p->array_position++;
@@ -353,7 +354,6 @@ void SHA1_Iterate_Hash(struct sha1_word_pointer *p, uint32_t *H)
 
 void SHA1_Compute(struct sha1_word_pointer *p, uint32_t *hash)
 {
-    
     const uint32_t H_init[] = {0x67452301,       /* Initial SHA1 hash vector */
                                0xefcdab89,
                                0x98badcfe,
@@ -387,7 +387,7 @@ void SHA1_Compute(struct sha1_word_pointer *p, uint32_t *hash)
  * FUNCTION NAME: SHA1_Concat
  *
  * PURPOSE: Takes as an argument a collection of char arrays, performs a virtual concatenation of these arrays in their given order,
- *          performs the SHA1 algorithm on the concatenated array and stores the resulting hash.
+ *          implements the SHA1 algorithm on the concatenated array and stores the resulting hash.
  *
  * ARGUMENTS:
  *
