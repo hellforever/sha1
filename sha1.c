@@ -3,7 +3,7 @@
  *
  * Copyright (c)  2016 Anders Nordenfelt
  *
- * DATED: 2016-08-16
+ * DATED: 2016-08-21
  *
  * CONTENT: Implements the SHA1 hash algorithm and its corresponding HMAC-SHA1 function in accordance with the 
  *          NIST specifications (FIPS PUB 180-4) and (FIPS PUB 198-1).
@@ -74,73 +74,97 @@ void Move_Forward_One_Word(struct sha1_word_pointer *p)
 
     if (p->fp == NULL)  /* Perform the following for a string concatenation */
     {
-        i = 0;
-        while (i < WORD_SIZE)
+        /* Fast track if the position is not close to the edge of the current string */
+        if(p->array_position + 4 < p->strings_byte_size[p->array_index] && p->array_index < p->nr_of_strings)
         {
-            /* If the pointer is still within a string, load the word with a byte from the string and move forward one byte*/
-            if (p->array_position < p->strings_byte_size[p->array_index] && p->array_index < p->nr_of_strings)
+            p->word[0] = (unsigned char) p->strings[p->array_index][p->array_position];
+            p->word[1] = (unsigned char) p->strings[p->array_index][p->array_position + 1];
+            p->word[2] = (unsigned char) p->strings[p->array_index][p->array_position + 2];
+            p->word[3] = (unsigned char) p->strings[p->array_index][p->array_position + 3];
+            p->array_position = p->array_position + 4;
+        }
+        else
+        {
+        i = 0;
+            while (i < WORD_SIZE)
             {
-                p->word[i] = (unsigned char) p->strings[p->array_index][p->array_position];
-                p->array_position++;
-                i++;
-            }
-            /* If the pointer is at the end of a string, jump to the next string */
-            else if (p->array_position == p->strings_byte_size[p->array_index])
-            {
-                p->array_index++;
-                p->array_position = 0;
-            }
-            /* If the pointer is in the pad, load the word with a byte from the pad and move forward one byte within the pad */
-            else if (p->is_in_pad == TRUE && p->pad_position < p->pad_byte_size)
-            {
-                p->word[i] = p->pad[p->pad_position];
-                p->pad_position++;
-                i++;
-            }
-            /* If there are no more strings, jump into the pad */
-            else if (p->array_index == p->nr_of_strings)
-            {
-                p->is_in_pad = TRUE;
-                p->pad_position = 0;
-            }
-            /* Else load a zero-byte to the word */
-            else
-            {
-                p->word[i] = 0;
-                i++;
+                /* If the pointer is still within a string, load the word with a byte from the string and move forward one byte*/
+                if (p->array_position < p->strings_byte_size[p->array_index] && p->array_index < p->nr_of_strings)
+                {
+                    p->word[i] = (unsigned char) p->strings[p->array_index][p->array_position];
+                    p->array_position++;
+                    i++;
+                }
+                /* If the pointer is at the end of a string, jump to the next string */
+                else if (p->array_position == p->strings_byte_size[p->array_index])
+                {
+                    p->array_index++;
+                    p->array_position = 0;
+                }
+                /* If the pointer is in the pad, load the word with a byte from the pad and move forward one byte within the pad */
+                else if (p->is_in_pad == TRUE && p->pad_position < p->pad_byte_size)
+                {
+                    p->word[i] = p->pad[p->pad_position];
+                    p->pad_position++;
+                    i++;
+                }
+                /* If there are no more strings, jump into the pad */
+                else if (p->array_index == p->nr_of_strings)
+                {
+                    p->is_in_pad = TRUE;
+                    p->pad_position = 0;
+                }
+                /* Else load a zero-byte to the word */
+                else
+                {
+                    p->word[i] = 0;
+                    i++;
+                }
             }
         }
     }
     else /* Perform the following for a file */
     {
-        i = 0;
-        while (i < WORD_SIZE)
+        /* Fast track if the position is not close to the pad */
+        if(p->file_position + 4 < p->file_byte_size)
         {
-            /* If the pointer is still within the file, load the word with a byte from the file and move forward one byte */
-            if ( p->file_position < p->file_byte_size)
+            p->word[0] = (unsigned char) fgetc(p->fp);
+            p->word[1] = (unsigned char) fgetc(p->fp);
+            p->word[2] = (unsigned char) fgetc(p->fp);
+            p->word[3] = (unsigned char) fgetc(p->fp);
+            p->file_position = p->file_position + 4;
+        }
+        else
+        {
+            i = 0;
+            while (i < WORD_SIZE)
             {
-                p->word[i] = (unsigned char) fgetc(p->fp);
-                p->file_position++;
-                i++;
-            }
-            /* If the pointer is in the pad, load the word with a byte from the pad and move forward one byte within the pad */
-            else if (p->is_in_pad == TRUE && p->pad_position < p->pad_byte_size)
-            {
-                p->word[i] = p->pad[p->pad_position];
-                p->pad_position++;
-                i++;
-            }
-            /* If we have reached the end of the file, jump into the pad */
-            else if (p->is_in_pad == FALSE && p->file_position == p->file_byte_size)
-            {
-                p->is_in_pad = TRUE;
-                p->pad_position = 0;
-            }
-            /* Else load a zero-byte to the word */
-            else
-            {
-                p->word[i] = 0;
-                i++;
+                /* If the pointer is still within the file, load the word with a byte from the file and move forward one byte */
+                if ( p->file_position < p->file_byte_size)
+                {
+                    p->word[i] = (unsigned char) fgetc(p->fp);
+                    p->file_position++;
+                    i++;
+                }
+                /* If the pointer is in the pad, load the word with a byte from the pad and move forward one byte within the pad */
+                else if (p->is_in_pad == TRUE && p->pad_position < p->pad_byte_size)
+                {
+                    p->word[i] = p->pad[p->pad_position];
+                    p->pad_position++;
+                    i++;
+                }
+                /* If we have reached the end of the file, jump into the pad */
+                else if (p->is_in_pad == FALSE && p->file_position == p->file_byte_size)
+                {
+                    p->is_in_pad = TRUE;
+                    p->pad_position = 0;
+                }
+                /* Else load a zero-byte to the word */
+                else
+                {
+                    p->word[i] = 0;
+                    i++;
+                }
             }
         }
     }
@@ -179,17 +203,27 @@ void Set_Pad(struct sha1_word_pointer *p, unsigned char *pad, uint64_t text_byte
     unsigned int pad_byte_size;                         /* the size of the pad                                     */
     uint64_t text_bit_size;                             /* the size in BITS of the text                            */
 
+    /* Calculate the number of zeros in the pad and the pad size */
+
     nr_of_zeros = (BLOCK_SIZE - ((text_byte_size + 9) % BLOCK_SIZE)) % BLOCK_SIZE; 
     pad_byte_size = 9 + nr_of_zeros;
 
-    pad[0] = DELIMITER;                                 /* Set the first byte in the pad equal to the delimiter 10000000b */
+    /* Set the first byte in the pad equal to the delimiter 10000000b */
+
+    pad[0] = DELIMITER;                                 
+
+    /* Insert the zeros in the pad */
 
     for (i = 1; i <= nr_of_zeros; i++) 
-        pad[i] = 0;                                     /* Insert the zeros in the pad */
+        pad[i] = 0; 
+
+    /* Insert an 8-byte rep. of the bit-size at the end of the pad */                                
 
     text_bit_size = 8*text_byte_size;      
     for (i = 0; i < 8; i++)
-        pad[pad_byte_size - i - 1] = (text_bit_size >> i*8) & 255;    /* Insert an 8-byte rep. of the bit-size at the end of the pad */
+        pad[pad_byte_size - i - 1] = (text_bit_size >> i*8) & 255;  
+
+    /* Put the pad and related data in the word pointer */  
 
     p->pad = pad;
     p->pad_position = 0;
