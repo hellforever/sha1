@@ -12,7 +12,7 @@
 
 struct sha1_word_pointer;
 
-void Move_Forward_One_Word(struct sha1_word_pointer *p);
+void Load_Buffer(struct sha1_word_pointer *p);
 
 void Set_Zero(struct sha1_word_pointer *p);
 

@@ -3,7 +3,7 @@
  *
  * Copyright (c)  2016 Anders Nordenfelt
  *
- * DATED: 2016-08-21
+ * DATED: 2016-08-23
  *
  * CONTENT: Implements the SHA1 hash algorithm and its corresponding HMAC-SHA1 function in accordance with the 
  *          NIST specifications (FIPS PUB 180-4) and (FIPS PUB 198-1).
@@ -42,57 +42,57 @@
 
 struct sha1_word_pointer
 {
-    unsigned char word[WORD_SIZE];  /* contains the current word                                                        */
-    unsigned int uint_rep;          /* provides an integer representation of the current word                           */
-    uint64_t tot_byte_size;         /* the total size in bytes of the text including the pad                            */
+    unsigned char buffer[BLOCK_SIZE];         /* contains the current buffer                                                */
+    uint32_t uint_rep[BLOCK_SIZE/WORD_SIZE] ; /* provides an integer representation of the current word                     */
+    uint64_t tot_byte_size;                   /* the total size in bytes of the text including the pad                      */
 
-    char **strings;                 /* pointer to the array of strings                                                  */
-    uint64_t array_index;           /* index specifying in which string the pointer is positioned                       */
-    uint64_t array_position;        /* index specifying where in the current string the pointer is positioned           */
-    uint64_t nr_of_strings;         /* the number of strings in the concatenation                                       */
-    uint64_t *strings_byte_size;    /* array containing the byte sizes of the strings in the concatenation              */
+    char **strings;                           /* pointer to the array of strings                                            */
+    uint64_t array_index;                     /* index specifying in which string the pointer is positioned                 */
+    uint64_t array_position;                  /* index specifying where in the current string the pointer is positioned     */
+    uint64_t nr_of_strings;                   /* the number of strings in the concatenation                                 */
+    uint64_t *strings_byte_size;              /* array containing the byte sizes of the strings in the concatenation        */
 
-    FILE *fp;                       /* pointer to the file to be hashed, if any
-                                       IMPORTANT! this pointer must be set to NULL if you want to hash strings instead  */
-    uint64_t file_byte_size;        /* size in bytes of the file to be hashed                                           */
-    uint64_t file_position;         /* position in the file                                                             */
+    FILE *fp;                                 /* pointer to the file to be hashed, if any
+                                              IMPORTANT! this pointer must be set to NULL if you want to hash strings instead*/
+    uint64_t file_byte_size;                  /* size in bytes of the file to be hashed                                     */
+    uint64_t file_position;                   /* position in the file                                                       */
 
-    unsigned char *pad;             /* the pad                                                                          */
-    unsigned int pad_byte_size;     /* pad length in bytes                                                              */
-    unsigned int pad_position;      /* specifies the position in the pad                                                */
-    int is_in_pad;                  /* specifies whether the pointer is in the pad or not                               */
+    unsigned char *pad;                       /* the pad                                                                    */
+    unsigned int pad_byte_size;               /* pad length in bytes                                                        */
+    unsigned int pad_position;                /* specifies the position in the pad                                          */
+    int is_in_pad;                            /* specifies whether the pointer is in the pad or not                         */
 };
 
 /*-----------------------------------------------------------------------------------------------------------------------------*/
 
-/* The function Move_Forward_One_Word advances the position of the word-pointer, loads a new word and saves its corresponding 
+/* The function Load_Buffer advances the position of the word-pointer one block and saves its corresponding 
    integer representation. */
 
 
-void Move_Forward_One_Word(struct sha1_word_pointer *p)
+void Load_Buffer(struct sha1_word_pointer *p)
 {
     int i;              /* internal counter variable */
 
     if (p->fp == NULL)  /* Perform the following for a string concatenation */
     {
         /* Fast track if the position is not close to the edge of the current string */
-        if(p->array_index < p->nr_of_strings && p->array_position + 4 < p->strings_byte_size[p->array_index])
+
+        if(p->array_index < p->nr_of_strings && p->array_position + BLOCK_SIZE < p->strings_byte_size[p->array_index])
         {
-            p->word[0] = (unsigned char) p->strings[p->array_index][p->array_position];
-            p->word[1] = (unsigned char) p->strings[p->array_index][p->array_position + 1];
-            p->word[2] = (unsigned char) p->strings[p->array_index][p->array_position + 2];
-            p->word[3] = (unsigned char) p->strings[p->array_index][p->array_position + 3];
-            p->array_position = p->array_position + 4;
+            for(i = 0; i < BLOCK_SIZE; i++)
+                p->buffer[i] = (unsigned char) p->strings[p->array_index][p->array_position + i];
+
+            p->array_position = p->array_position + BLOCK_SIZE;
         }
         else
         {
             i = 0;
-            while (i < WORD_SIZE)
+            do
             {
                 /* If the pointer is still within a string, load the word with a byte from the string and move forward one byte*/
                 if (p->array_index < p->nr_of_strings && p->array_position < p->strings_byte_size[p->array_index])
                 {
-                    p->word[i] = (unsigned char) p->strings[p->array_index][p->array_position];
+                    p->buffer[i] = (unsigned char) p->strings[p->array_index][p->array_position];
                     p->array_position++;
                     i++;
                 }
@@ -105,7 +105,7 @@ void Move_Forward_One_Word(struct sha1_word_pointer *p)
                 /* If the pointer is in the pad, load the word with a byte from the pad and move forward one byte within the pad */
                 else if (p->is_in_pad == TRUE && p->pad_position < p->pad_byte_size)
                 {
-                    p->word[i] = p->pad[p->pad_position];
+                    p->buffer[i] = p->pad[p->pad_position];
                     p->pad_position++;
                     i++;
                 }
@@ -118,39 +118,39 @@ void Move_Forward_One_Word(struct sha1_word_pointer *p)
                 /* Else load a zero-byte to the word */
                 else
                 {
-                    p->word[i] = 0;
+                    p->buffer[i] = 0;
                     i++;
                 }
-            }
+            }while (i < BLOCK_SIZE);
         }
     }
     else /* Perform the following for a file */
     {
         /* Fast track if the position is not close to the pad */
-        if(p->file_position + 4 < p->file_byte_size)
+
+        if(p->file_position + BLOCK_SIZE < p->file_byte_size)
         {
-            p->word[0] = (unsigned char) fgetc(p->fp);
-            p->word[1] = (unsigned char) fgetc(p->fp);
-            p->word[2] = (unsigned char) fgetc(p->fp);
-            p->word[3] = (unsigned char) fgetc(p->fp);
-            p->file_position = p->file_position + 4;
+            for(i = 0; i < BLOCK_SIZE; i++)
+                p->buffer[i] = (unsigned char) fgetc(p->fp);
+
+            p->file_position = p->file_position + BLOCK_SIZE;
         }
         else
         {
             i = 0;
-            while (i < WORD_SIZE)
+            do
             {
                 /* If the pointer is still within the file, load the word with a byte from the file and move forward one byte */
                 if ( p->file_position < p->file_byte_size)
                 {
-                    p->word[i] = (unsigned char) fgetc(p->fp);
+                    p->buffer[i] = (unsigned char) fgetc(p->fp);
                     p->file_position++;
                     i++;
                 }
                 /* If the pointer is in the pad, load the word with a byte from the pad and move forward one byte within the pad */
                 else if (p->is_in_pad == TRUE && p->pad_position < p->pad_byte_size)
                 {
-                    p->word[i] = p->pad[p->pad_position];
+                    p->buffer[i] = p->pad[p->pad_position];
                     p->pad_position++;
                     i++;
                 }
@@ -163,14 +163,18 @@ void Move_Forward_One_Word(struct sha1_word_pointer *p)
                 /* Else load a zero-byte to the word */
                 else
                 {
-                    p->word[i] = 0;
+                    p->buffer[i] = 0;
                     i++;
                 }
-            }
+            }while (i < BLOCK_SIZE);
         }
     }
-    /* Convert the word to a 32-bit integer and store the result */
-    p->uint_rep = ((uint32_t) p->word[0] << 24) | ((uint32_t) p->word[1] << 16) | ((uint32_t) p->word[2] << 8) | p->word[3];
+    /* Convert the words to 32-bit integers and store the result */
+    for(i = 0; i < BLOCK_SIZE/WORD_SIZE; i++)
+        p->uint_rep[i] = ((uint32_t) p->buffer[i*WORD_SIZE] << 24) | 
+                         ((uint32_t) p->buffer[i*WORD_SIZE + 1] << 16) | 
+                         ((uint32_t) p->buffer[i*WORD_SIZE + 2] << 8) | 
+                         ((uint32_t) p->buffer[i*WORD_SIZE + 3]);
 }
 
 /*------------------------------------------------------------------------------------------------------------------------------*/
@@ -286,12 +290,13 @@ void SHA1_Iterate_Hash(struct sha1_word_pointer *p, uint32_t *H)
                               0xca62c1d6, 0xca62c1d6, 0xca62c1d6, 0xca62c1d6};
 
     int i;                                    /* internal counter variable                  */
-    uint32_t W[80], a, b, c, d, e, T;         /* integers variables used in the algorithm   */ 
+    uint32_t W[80], a, b, c, d, e, T;         /* integers variables used in the algorithm   */
+
+    Load_Buffer(p);
 
     for (i = 0; i < 16; i++)
     {
-        W[i] = p->uint_rep;                   /* Loads the variable W[i] with the integer representation of the current word */
-        Move_Forward_One_Word(p);
+        W[i] = p->uint_rep[i];                /* Loads the variable W[i] with the integer representation of the current word */
     }
 
     for (i = 16; i < 80; i++)
@@ -369,8 +374,6 @@ void SHA1_Compute(struct sha1_word_pointer *p, uint32_t *hash)
         H[i] = H_init[i];
 
     /* Iterate the hash */
-
-    Move_Forward_One_Word(p);
 
     N = p->tot_byte_size/BLOCK_SIZE;
     for (i = 0; i < N; i++)
