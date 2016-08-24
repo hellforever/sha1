@@ -3,7 +3,7 @@
  *
  * Copyright (c)  2016 Anders Nordenfelt
  *
- * DATED: 2016-08-23
+ * DATED: 2016-08-25
  *
  * CONTENT: Implements the SHA1 hash algorithm and its corresponding HMAC-SHA1 function in accordance with the 
  *          NIST specifications (FIPS PUB 180-4) and (FIPS PUB 198-1).
@@ -42,8 +42,8 @@
 
 struct sha1_word_pointer
 {
-    unsigned char buffer[BLOCK_SIZE];         /* contains the current buffer                                                */
-    uint32_t uint_rep[BLOCK_SIZE/WORD_SIZE] ; /* provides an integer representation of the current word                     */
+    unsigned char buffer[BLOCK_SIZE];         /* space to store a buffer when needed                                        */
+
     uint64_t tot_byte_size;                   /* the total size in bytes of the text including the pad                      */
 
     char **strings;                           /* pointer to the array of strings                                            */
@@ -69,7 +69,7 @@ struct sha1_word_pointer
    integer representation. */
 
 
-void Load_Buffer(struct sha1_word_pointer *p)
+void Load_Buffer(struct sha1_word_pointer *p, uint32_t* W)
 {
     int i;              /* internal counter variable */
 
@@ -79,8 +79,11 @@ void Load_Buffer(struct sha1_word_pointer *p)
 
         if(p->array_index < p->nr_of_strings && p->array_position + BLOCK_SIZE < p->strings_byte_size[p->array_index])
         {
-            for(i = 0; i < BLOCK_SIZE; i++)
-                p->buffer[i] = (unsigned char) p->strings[p->array_index][p->array_position + i];
+            for(i = 0; i < BLOCK_SIZE/WORD_SIZE; i++)
+                W[i] = (unsigned char) p->strings[p->array_index][p->array_position + 4*i] << 24 |
+                       (unsigned char) p->strings[p->array_index][p->array_position + 4*i + 1] << 16 |
+                       (unsigned char) p->strings[p->array_index][p->array_position + 4*i + 2] << 8 |
+                       (unsigned char) p->strings[p->array_index][p->array_position + 4*i + 3];
 
             p->array_position = p->array_position + BLOCK_SIZE;
         }
@@ -122,6 +125,13 @@ void Load_Buffer(struct sha1_word_pointer *p)
                     exit(EXIT_FAILURE); 
                 }
             }while (i < BLOCK_SIZE);
+
+            /* Convert the buffer to 32-bit integers and store the result */
+            for(i = 0; i < BLOCK_SIZE/WORD_SIZE; i++)
+                   W[i] = p->buffer[i*WORD_SIZE] << 24 | 
+                          p->buffer[i*WORD_SIZE + 1] << 16 | 
+                          p->buffer[i*WORD_SIZE + 2] << 8 | 
+                          p->buffer[i*WORD_SIZE + 3];
         }
     }
     else /* Perform the following for a file */
@@ -130,8 +140,11 @@ void Load_Buffer(struct sha1_word_pointer *p)
 
         if(p->file_position + BLOCK_SIZE < p->file_byte_size)
         {
-            for(i = 0; i < BLOCK_SIZE; i++)
-                p->buffer[i] = (unsigned char) fgetc(p->fp);
+            for(i = 0; i < BLOCK_SIZE/WORD_SIZE; i++)
+                W[i] = (unsigned char) fgetc(p->fp) << 24 |
+                       (unsigned char) fgetc(p->fp) << 16 |
+                       (unsigned char) fgetc(p->fp) << 8 |
+                       (unsigned char) fgetc(p->fp);
 
             p->file_position = p->file_position + BLOCK_SIZE;
         }
@@ -167,14 +180,15 @@ void Load_Buffer(struct sha1_word_pointer *p)
                     exit(EXIT_FAILURE); 
                 }
             }while (i < BLOCK_SIZE);
+
+            /* Convert the buffer to 32-bit integers and store the result */
+            for(i = 0; i < BLOCK_SIZE/WORD_SIZE; i++)
+                   W[i] = p->buffer[i*WORD_SIZE] << 24 | 
+                          p->buffer[i*WORD_SIZE + 1] << 16 | 
+                          p->buffer[i*WORD_SIZE + 2] << 8 | 
+                          p->buffer[i*WORD_SIZE + 3];
         }
     }
-    /* Convert the words to 32-bit integers and store the result */
-    for(i = 0; i < BLOCK_SIZE/WORD_SIZE; i++)
-        p->uint_rep[i] = ((uint32_t) p->buffer[i*WORD_SIZE] << 24) | 
-                         ((uint32_t) p->buffer[i*WORD_SIZE + 1] << 16) | 
-                         ((uint32_t) p->buffer[i*WORD_SIZE + 2] << 8) | 
-                         ((uint32_t) p->buffer[i*WORD_SIZE + 3]);
 }
 
 /*------------------------------------------------------------------------------------------------------------------------------*/
@@ -266,38 +280,15 @@ void Conv_Int_To_Word(uint32_t i, char *a)
 /* The function SHA1_Iterate_Hash implements the SHA1 hash iteration function. See the NIST documentation (FIPS PUB 180-4) for details. */
 
 
+
+
 void SHA1_Iterate_Hash(struct sha1_word_pointer *p, uint32_t *H)
 {
-    const unsigned int K[] = {0x5a827999, 0x5a827999, 0x5a827999, 0x5a827999,   /* SHA1 constant vector */
-                              0x5a827999, 0x5a827999, 0x5a827999, 0x5a827999,
-                              0x5a827999, 0x5a827999, 0x5a827999, 0x5a827999,  
-                              0x5a827999, 0x5a827999, 0x5a827999, 0x5a827999,
-                              0x5a827999, 0x5a827999, 0x5a827999, 0x5a827999,
-                              0x6ed9eba1, 0x6ed9eba1, 0x6ed9eba1, 0x6ed9eba1, 
-                              0x6ed9eba1, 0x6ed9eba1, 0x6ed9eba1, 0x6ed9eba1,
-                              0x6ed9eba1, 0x6ed9eba1, 0x6ed9eba1, 0x6ed9eba1,
-                              0x6ed9eba1, 0x6ed9eba1, 0x6ed9eba1, 0x6ed9eba1,
-                              0x6ed9eba1, 0x6ed9eba1, 0x6ed9eba1, 0x6ed9eba1,
-                              0x8f1bbcdc, 0x8f1bbcdc, 0x8f1bbcdc, 0x8f1bbcdc,
-                              0x8f1bbcdc, 0x8f1bbcdc, 0x8f1bbcdc, 0x8f1bbcdc,
-                              0x8f1bbcdc, 0x8f1bbcdc, 0x8f1bbcdc, 0x8f1bbcdc,
-                              0x8f1bbcdc, 0x8f1bbcdc, 0x8f1bbcdc, 0x8f1bbcdc,
-                              0x8f1bbcdc, 0x8f1bbcdc, 0x8f1bbcdc, 0x8f1bbcdc,
-                              0xca62c1d6, 0xca62c1d6, 0xca62c1d6, 0xca62c1d6,
-                              0xca62c1d6, 0xca62c1d6, 0xca62c1d6, 0xca62c1d6,
-                              0xca62c1d6, 0xca62c1d6, 0xca62c1d6, 0xca62c1d6,
-                              0xca62c1d6, 0xca62c1d6, 0xca62c1d6, 0xca62c1d6,
-                              0xca62c1d6, 0xca62c1d6, 0xca62c1d6, 0xca62c1d6};
 
     int i;                                    /* internal counter variable                  */
     uint32_t W[80], a, b, c, d, e, T;         /* integers variables used in the algorithm   */
 
-    Load_Buffer(p);
-
-    for (i = 0; i < 16; i++)
-    {
-        W[i] = p->uint_rep[i];                /* Loads the variable W[i] with the integer representation of the current word */
-    }
+    Load_Buffer(p, W);
 
     for (i = 16; i < 80; i++)
         W[i] = Rot_Left(1, W[i-3] ^ W[i-8] ^ W[i-14] ^ W[i-16]);
@@ -310,7 +301,7 @@ void SHA1_Iterate_Hash(struct sha1_word_pointer *p, uint32_t *H)
 
     for (i = 0; i < 20; i++)
     {
-        T = Rot_Left(5, a) + Ch(b, c, d) + e + K[i] + W[i];
+        T = Rot_Left(5, a) + Ch(b, c, d) + e + 0x5a827999 + W[i];
         e = d;
         d = c;
         c = Rot_Left(30, b);
@@ -320,7 +311,7 @@ void SHA1_Iterate_Hash(struct sha1_word_pointer *p, uint32_t *H)
 
     for (i = 20; i < 40; i++)
     {
-        T = Rot_Left(5, a) + Parity(b, c, d) + e + K[i] + W[i];
+        T = Rot_Left(5, a) + Parity(b, c, d) + e + 0x6ed9eba1 + W[i];
         e = d;
         d = c;
         c = Rot_Left(30, b);
@@ -330,7 +321,7 @@ void SHA1_Iterate_Hash(struct sha1_word_pointer *p, uint32_t *H)
 
     for (i = 40; i < 60; i++)
     {
-        T = Rot_Left(5, a) + Maj(b, c, d) + e + K[i] + W[i];
+        T = Rot_Left(5, a) + Maj(b, c, d) + e + 0x8f1bbcdc + W[i];
         e = d;
         d = c;
         c = Rot_Left(30, b);
@@ -340,7 +331,7 @@ void SHA1_Iterate_Hash(struct sha1_word_pointer *p, uint32_t *H)
 
     for (i = 60; i < 80; i++)
     {
-        T = Rot_Left(5, a) + Parity(b, c, d) + e + K[i] + W[i];
+        T = Rot_Left(5, a) + Parity(b, c, d) + e + 0xca62c1d6 + W[i];
         e = d;
         d = c;
         c = Rot_Left(30, b);

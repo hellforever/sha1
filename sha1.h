@@ -12,7 +12,7 @@
 
 struct sha1_word_pointer;
 
-void Load_Buffer(struct sha1_word_pointer *p);
+void Load_Buffer(struct sha1_word_pointer *p, uint32_t *W);
 
 void Set_Zero(struct sha1_word_pointer *p);
 
