@@ -89,21 +89,8 @@ void Load_Buffer(struct sha1_word_pointer *p)
             i = 0;
             do
             {
-                /* If the pointer is still within a string, load the word with a byte from the string and move forward one byte*/
-                if (p->array_index < p->nr_of_strings && p->array_position < p->strings_byte_size[p->array_index])
-                {
-                    p->buffer[i] = (unsigned char) p->strings[p->array_index][p->array_position];
-                    p->array_position++;
-                    i++;
-                }
-                /* If the pointer is at the end of a string, jump to the next string */
-                else if (p->array_position == p->strings_byte_size[p->array_index])
-                {
-                    p->array_index++;
-                    p->array_position = 0;
-                }
                 /* If the pointer is in the pad, load the word with a byte from the pad and move forward one byte within the pad */
-                else if (p->is_in_pad == TRUE && p->pad_position < p->pad_byte_size)
+                if (p->is_in_pad == TRUE && p->pad_position < p->pad_byte_size)
                 {
                     p->buffer[i] = p->pad[p->pad_position];
                     p->pad_position++;
@@ -115,11 +102,24 @@ void Load_Buffer(struct sha1_word_pointer *p)
                     p->is_in_pad = TRUE;
                     p->pad_position = 0;
                 }
-                /* Else load a zero-byte to the word */
+                /* If the pointer is at the end of a string, jump to the next string */
+                else if (p->array_position == p->strings_byte_size[p->array_index])
+                {
+                    p->array_index++;
+                    p->array_position = 0;
+                }
+                /* If the pointer is still within a string, load the word with a byte from the string and move forward one byte*/
+                else if (p->array_index < p->nr_of_strings && p->array_position < p->strings_byte_size[p->array_index])
+                {
+                    p->buffer[i] = (unsigned char) p->strings[p->array_index][p->array_position];
+                    p->array_position++;
+                    i++;
+                }
+                /* Else report error */
                 else
                 {
-                    p->buffer[i] = 0;
-                    i++;
+                    printf("Error while loading SHA1 buffer\n");
+                    exit(EXIT_FAILURE); 
                 }
             }while (i < BLOCK_SIZE);
         }
@@ -140,15 +140,8 @@ void Load_Buffer(struct sha1_word_pointer *p)
             i = 0;
             do
             {
-                /* If the pointer is still within the file, load the word with a byte from the file and move forward one byte */
-                if ( p->file_position < p->file_byte_size)
-                {
-                    p->buffer[i] = (unsigned char) fgetc(p->fp);
-                    p->file_position++;
-                    i++;
-                }
                 /* If the pointer is in the pad, load the word with a byte from the pad and move forward one byte within the pad */
-                else if (p->is_in_pad == TRUE && p->pad_position < p->pad_byte_size)
+                if (p->is_in_pad == TRUE && p->pad_position < p->pad_byte_size)
                 {
                     p->buffer[i] = p->pad[p->pad_position];
                     p->pad_position++;
@@ -160,11 +153,18 @@ void Load_Buffer(struct sha1_word_pointer *p)
                     p->is_in_pad = TRUE;
                     p->pad_position = 0;
                 }
-                /* Else load a zero-byte to the word */
+                /* If the pointer is still within the file, load the word with a byte from the file and move forward one byte */
+                else if ( p->file_position < p->file_byte_size)
+                {
+                    p->buffer[i] = (unsigned char) fgetc(p->fp);
+                    p->file_position++;
+                    i++;
+                }
+                /* Else report error */
                 else
                 {
-                    p->buffer[i] = 0;
-                    i++;
+                    printf("Error while loading SHA1 buffer\n");
+                    exit(EXIT_FAILURE); 
                 }
             }while (i < BLOCK_SIZE);
         }

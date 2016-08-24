@@ -139,7 +139,7 @@ void Test_SHA1::SHA1_test1()
     for(int i = 0; i < HASH_SIZE; i++)
         CPPUNIT_ASSERT(digest[i] == reference[i]);
 
-    delete msg;
+    delete[] msg;
 }
 
 
