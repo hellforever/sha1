@@ -24,12 +24,6 @@
 #define HASH_SIZE 5         /* defines the size of the hash in number of 32-bit INTEGERS                */
 #define DELIMITER 128       /* defines the unsigned char representation of the bit sequence '10000000'  */
 
-/* MACROS */
-
-#define Rot_Left(t, x) (((x) << t) | ((x) >> (32 - t)))
-#define Ch(x, y, z) ((x & y) ^ (~x & z))
-#define Parity(x, y, z) (x ^ y ^ z)
-#define Maj(x, y, z) ((x & y) ^ (x & z) ^ (y & z))
 
 /************************************************************************************************************************************
  *
@@ -87,12 +81,14 @@ void Load_Buffer(struct sha1_word_pointer *p, uint32_t* W)
 
             p->array_position = p->array_position + BLOCK_SIZE;
         }
+
         else
         {
             i = 0;
+
             do
             {
-                /* If the pointer is in the pad, load the word with a byte from the pad and move forward one byte within the pad */
+                /* If the pointer is in the pad, load the buffer with a byte from the pad */
                 if (p->is_in_pad == TRUE && p->pad_position < p->pad_byte_size)
                 {
                     p->buffer[i] = p->pad[p->pad_position];
@@ -111,7 +107,7 @@ void Load_Buffer(struct sha1_word_pointer *p, uint32_t* W)
                     p->array_index++;
                     p->array_position = 0;
                 }
-                /* If the pointer is still within a string, load the word with a byte from the string and move forward one byte*/
+                /* If the pointer is still within a string, load the buffer with a byte from the string */
                 else if (p->array_index < p->nr_of_strings && p->array_position < p->strings_byte_size[p->array_index])
                 {
                     p->buffer[i] = (unsigned char) p->strings[p->array_index][p->array_position];
@@ -128,10 +124,10 @@ void Load_Buffer(struct sha1_word_pointer *p, uint32_t* W)
 
             /* Convert the buffer to 32-bit integers and store the result */
             for(i = 0; i < BLOCK_SIZE/WORD_SIZE; i++)
-                   W[i] = p->buffer[i*WORD_SIZE] << 24 | 
-                          p->buffer[i*WORD_SIZE + 1] << 16 | 
-                          p->buffer[i*WORD_SIZE + 2] << 8 | 
-                          p->buffer[i*WORD_SIZE + 3];
+                W[i] = p->buffer[i*WORD_SIZE] << 24 | 
+                       p->buffer[i*WORD_SIZE + 1] << 16 | 
+                       p->buffer[i*WORD_SIZE + 2] << 8 | 
+                       p->buffer[i*WORD_SIZE + 3];
         }
     }
     else /* Perform the following for a file */
@@ -148,12 +144,14 @@ void Load_Buffer(struct sha1_word_pointer *p, uint32_t* W)
 
             p->file_position = p->file_position + BLOCK_SIZE;
         }
+
         else
         {
             i = 0;
+
             do
             {
-                /* If the pointer is in the pad, load the word with a byte from the pad and move forward one byte within the pad */
+                /* If the pointer is in the pad, load the buffer with a byte from the pad */
                 if (p->is_in_pad == TRUE && p->pad_position < p->pad_byte_size)
                 {
                     p->buffer[i] = p->pad[p->pad_position];
@@ -166,7 +164,7 @@ void Load_Buffer(struct sha1_word_pointer *p, uint32_t* W)
                     p->is_in_pad = TRUE;
                     p->pad_position = 0;
                 }
-                /* If the pointer is still within the file, load the word with a byte from the file and move forward one byte */
+                /* If the pointer is still within the file, load the buffer with a byte from the file*/
                 else if ( p->file_position < p->file_byte_size)
                 {
                     p->buffer[i] = (unsigned char) fgetc(p->fp);
@@ -183,10 +181,10 @@ void Load_Buffer(struct sha1_word_pointer *p, uint32_t* W)
 
             /* Convert the buffer to 32-bit integers and store the result */
             for(i = 0; i < BLOCK_SIZE/WORD_SIZE; i++)
-                   W[i] = p->buffer[i*WORD_SIZE] << 24 | 
-                          p->buffer[i*WORD_SIZE + 1] << 16 | 
-                          p->buffer[i*WORD_SIZE + 2] << 8 | 
-                          p->buffer[i*WORD_SIZE + 3];
+                W[i] = p->buffer[i*WORD_SIZE] << 24 | 
+                       p->buffer[i*WORD_SIZE + 1] << 16 | 
+                       p->buffer[i*WORD_SIZE + 2] << 8 | 
+                       p->buffer[i*WORD_SIZE + 3];
         }
     }
 }
@@ -213,7 +211,8 @@ void Set_Zero(struct sha1_word_pointer *p)
 
 /*------------------------------------------------------------------------------------------------------------------------------*/
 
-/* The function Set_Pad prepares and sets the pad, note that pointer with enough allocated memory for the pad must be provided  */
+/* The function Set_Pad prepares and sets the pad
+   Note that pointer with enough allocated memory for the pad must be provided  */
 
 void Set_Pad(struct sha1_word_pointer *p, unsigned char *pad, uint64_t text_byte_size)
 {
@@ -272,26 +271,53 @@ void Conv_Int_To_Word(uint32_t i, char *a)
 
 /***************************************************************************************************************************************
  * 
- *	SECTION: SHA1 IMPLEMENTATION
+ *  SECTION: SHA1 IMPLEMENTATION
  *
  **************************************************************************************************************************************/
 
-
-/* The function SHA1_Iterate_Hash implements the SHA1 hash iteration function. See the NIST documentation (FIPS PUB 180-4) for details. */
-
-
+/* The function SHA1_Iterate_Hash implements the SHA1 hash iteration function. 
+   See the NIST documentation (FIPS PUB 180-4) for details. 
+   This part of the code has been optimized for speed */
 
 
 void SHA1_Iterate_Hash(struct sha1_word_pointer *p, uint32_t *H)
 {
 
-    int i;                                    /* internal counter variable                  */
-    uint32_t W[80], a, b, c, d, e, T;         /* integers variables used in the algorithm   */
+    #define Rot_Left(t, x) (((x) << t) | ((x) >> (32 - t)))
+    #define Ch(x, y, z) ((x & y) ^ (~x & z))
+    #define Parity(x, y, z) (x ^ y ^ z)
+    #define Maj(x, y, z) ((x & y) ^ (x & z) ^ (y & z))
+
+    #define F1(a, b, c, d, e, x)                                    \
+    {                                                               \
+        e += Rot_Left(5, a) + Ch(b, c, d) + 0x5a827999 + x;         \
+        b =  Rot_Left(30, b);                                       \
+    }
+
+    #define F2(a, b, c, d, e, x)                                    \
+    {                                                               \
+        e += Rot_Left(5, a) + Parity(b, c, d) + 0x6ed9eba1 + x;     \
+        b = Rot_Left(30, b);                                        \
+    }
+
+    #define F3(a, b, c, d, e, x)                                    \
+    {                                                               \
+        e += Rot_Left(5, a) + Maj(b, c, d) + 0x8f1bbcdc + x;        \
+        b = Rot_Left(30, b);                                        \
+    }
+
+    #define F4(a, b, c, d, e, x)                                    \
+    {                                                               \
+        e += Rot_Left(5, a) + Parity(b, c, d) + 0xca62c1d6 + x;     \
+        b = Rot_Left(30, b);                                        \
+    }
+
+    #define U(i)  (W[i] = Rot_Left(1, W[i-3] ^ W[i-8] ^ W[i-14] ^ W[i-16]), W[i])
+
+
+    uint32_t W[80], a, b, c, d, e;
 
     Load_Buffer(p, W);
-
-    for (i = 16; i < 80; i++)
-        W[i] = Rot_Left(1, W[i-3] ^ W[i-8] ^ W[i-14] ^ W[i-16]);
 
     a = H[0];
     b = H[1];
@@ -299,51 +325,95 @@ void SHA1_Iterate_Hash(struct sha1_word_pointer *p, uint32_t *H)
     d = H[3];
     e = H[4];
 
-    for (i = 0; i < 20; i++)
-    {
-        T = Rot_Left(5, a) + Ch(b, c, d) + e + 0x5a827999 + W[i];
-        e = d;
-        d = c;
-        c = Rot_Left(30, b);
-        b = a;
-        a = T;
-    }
+    F1(a, b, c, d, e, W[0]);
+    F1(e, a, b, c, d, W[1]);
+    F1(d, e, a, b, c, W[2]);
+    F1(c, d, e, a, b, W[3]);
+    F1(b, c, d, e, a, W[4]);
+    F1(a, b, c, d, e, W[5]);
+    F1(e, a, b, c, d, W[6]);
+    F1(d, e, a, b, c, W[7]);
+    F1(c, d, e, a, b, W[8]);
+    F1(b, c, d, e, a, W[9]);
+    F1(a, b, c, d, e, W[10]);
+    F1(e, a, b, c, d, W[11]);
+    F1(d, e, a, b, c, W[12]);
+    F1(c, d, e, a, b, W[13]);
+    F1(b, c, d, e, a, W[14]);
+    F1(a, b, c, d, e, W[15]);
+    F1(e, a, b, c, d, U(16));
+    F1(d, e, a, b, c, U(17));
+    F1(c, d, e, a, b, U(18));
+    F1(b, c, d, e, a, U(19));
 
-    for (i = 20; i < 40; i++)
-    {
-        T = Rot_Left(5, a) + Parity(b, c, d) + e + 0x6ed9eba1 + W[i];
-        e = d;
-        d = c;
-        c = Rot_Left(30, b);
-        b = a;
-        a = T;
-    }
+    F2(a, b, c, d, e, U(20));
+    F2(e, a, b, c, d, U(21));
+    F2(d, e, a, b, c, U(22));
+    F2(c, d, e, a, b, U(23));
+    F2(b, c, d, e, a, U(24));
+    F2(a, b, c, d, e, U(25));
+    F2(e, a, b, c, d, U(26));
+    F2(d, e, a, b, c, U(27));
+    F2(c, d, e, a, b, U(28));
+    F2(b, c, d, e, a, U(29));
+    F2(a, b, c, d, e, U(30));
+    F2(e, a, b, c, d, U(31));
+    F2(d, e, a, b, c, U(32));
+    F2(c, d, e, a, b, U(33));
+    F2(b, c, d, e, a, U(34));
+    F2(a, b, c, d, e, U(35));
+    F2(e, a, b, c, d, U(36));
+    F2(d, e, a, b, c, U(37));
+    F2(c, d, e, a, b, U(38));
+    F2(b, c, d, e, a, U(39));
 
-    for (i = 40; i < 60; i++)
-    {
-        T = Rot_Left(5, a) + Maj(b, c, d) + e + 0x8f1bbcdc + W[i];
-        e = d;
-        d = c;
-        c = Rot_Left(30, b);
-        b = a;
-        a = T;
-    }
+    F3(a, b, c, d, e, U(40));
+    F3(e, a, b, c, d, U(41));
+    F3(d, e, a, b, c, U(42));
+    F3(c, d, e, a, b, U(43));
+    F3(b, c, d, e, a, U(44));
+    F3(a, b, c, d, e, U(45));
+    F3(e, a, b, c, d, U(46));
+    F3(d, e, a, b, c, U(47));
+    F3(c, d, e, a, b, U(48));
+    F3(b, c, d, e, a, U(49));
+    F3(a, b, c, d, e, U(50));
+    F3(e, a, b, c, d, U(51));
+    F3(d, e, a, b, c, U(52));
+    F3(c, d, e, a, b, U(53));
+    F3(b, c, d, e, a, U(54));
+    F3(a, b, c, d, e, U(55));
+    F3(e, a, b, c, d, U(56));
+    F3(d, e, a, b, c, U(57));
+    F3(c, d, e, a, b, U(58));
+    F3(b, c, d, e, a, U(59));
 
-    for (i = 60; i < 80; i++)
-    {
-        T = Rot_Left(5, a) + Parity(b, c, d) + e + 0xca62c1d6 + W[i];
-        e = d;
-        d = c;
-        c = Rot_Left(30, b);
-        b = a;
-        a = T;
-    }
+    F4(a, b, c, d, e, U(60));
+    F4(e, a, b, c, d, U(61));
+    F4(d, e, a, b, c, U(62));
+    F4(c, d, e, a, b, U(63));
+    F4(b, c, d, e, a, U(64));
+    F4(a, b, c, d, e, U(65));
+    F4(e, a, b, c, d, U(66));
+    F4(d, e, a, b, c, U(67));
+    F4(c, d, e, a, b, U(68));
+    F4(b, c, d, e, a, U(69));
+    F4(a, b, c, d, e, U(70));
+    F4(e, a, b, c, d, U(71));
+    F4(d, e, a, b, c, U(72));
+    F4(c, d, e, a, b, U(73));
+    F4(b, c, d, e, a, U(74));
+    F4(a, b, c, d, e, U(75));
+    F4(e, a, b, c, d, U(76));
+    F4(d, e, a, b, c, U(77));
+    F4(c, d, e, a, b, U(78));
+    F4(b, c, d, e, a, U(79));
 
-    H[0] = a + H[0];
-    H[1] = b + H[1];
-    H[2] = c + H[2];
-    H[3] = d + H[3];
-    H[4] = e + H[4];
+    H[0] += a;
+    H[1] += b;
+    H[2] += c;
+    H[3] += d;
+    H[4] += e;
 }
 
 /*------------------------------------------------------------------------------------------------------------------------------*/
@@ -380,8 +450,8 @@ void SHA1_Compute(struct sha1_word_pointer *p, uint32_t *hash)
  *
  * FUNCTION NAME: SHA1_Concat
  *
- * PURPOSE: Takes as an argument a collection of char arrays, performs a virtual concatenation of these arrays in their given order,
- *          implements the SHA1 algorithm on the concatenated array and stores the resulting hash.
+ * PURPOSE: Takes as an argument a collection of char arrays, performs a virtual concatenation of these arrays in
+ *          the order they appear, implements the SHA1 algorithm on the concatenated array and stores the resulting hash.
  *
  * ARGUMENTS:
  *
