@@ -24,7 +24,7 @@ void SHA1_Iterate_Hash(struct sha1_word_pointer *p, uint32_t *H);
 
 void SHA1_Compute(struct sha1_word_pointer *p, uint32_t *hash);
 
-void SHA1_Concat(char **strings, uint64_t nr_strings, uint64_t *strings_byte_len, uint32_t *hash);
+void SHA1_Concat(char **strings, uint64_t nr_of_strings, uint64_t *strings_byte_len, uint32_t *hash);
 
 void SHA1(char *text, uint64_t text_byte_size, uint32_t *hash);
 
