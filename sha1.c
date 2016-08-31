@@ -74,10 +74,7 @@ void Load_Buffer(struct sha1_word_pointer *p, uint32_t* W)
         if(p->array_index < p->nr_of_strings && p->array_position + BLOCK_SIZE < p->strings_byte_size[p->array_index])
         {
             for(i = 0; i < BLOCK_SIZE/WORD_SIZE; i++)
-                W[i] = (unsigned char) p->strings[p->array_index][p->array_position + 4*i] << 24 |
-                       (unsigned char) p->strings[p->array_index][p->array_position + 4*i + 1] << 16 |
-                       (unsigned char) p->strings[p->array_index][p->array_position + 4*i + 2] << 8 |
-                       (unsigned char) p->strings[p->array_index][p->array_position + 4*i + 3];
+                W[i] = Conv_Word_To_32Int((unsigned char*) &p->strings[p->array_index][p->array_position + 4*i]);
 
             p->array_position = p->array_position + BLOCK_SIZE;
         }
@@ -124,10 +121,7 @@ void Load_Buffer(struct sha1_word_pointer *p, uint32_t* W)
 
             /* Convert the buffer to 32-bit integers and store the result */
             for(i = 0; i < BLOCK_SIZE/WORD_SIZE; i++)
-                W[i] = p->buffer[i*WORD_SIZE] << 24 | 
-                       p->buffer[i*WORD_SIZE + 1] << 16 | 
-                       p->buffer[i*WORD_SIZE + 2] << 8 | 
-                       p->buffer[i*WORD_SIZE + 3];
+                W[i] = Conv_Word_To_32Int(&p->buffer[i*WORD_SIZE]);
         }
     }
     else /* Perform the following for a file */
@@ -159,7 +153,7 @@ void Load_Buffer(struct sha1_word_pointer *p, uint32_t* W)
                     i++;
                 }
                 /* If we have reached the end of the file, jump into the pad */
-                else if (p->is_in_pad == FALSE && p->file_position == p->file_byte_size)
+                else if (p->file_position == p->file_byte_size)
                 {
                     p->is_in_pad = TRUE;
                     p->pad_position = 0;
@@ -181,10 +175,7 @@ void Load_Buffer(struct sha1_word_pointer *p, uint32_t* W)
 
             /* Convert the buffer to 32-bit integers and store the result */
             for(i = 0; i < BLOCK_SIZE/WORD_SIZE; i++)
-                W[i] = p->buffer[i*WORD_SIZE] << 24 | 
-                       p->buffer[i*WORD_SIZE + 1] << 16 | 
-                       p->buffer[i*WORD_SIZE + 2] << 8 | 
-                       p->buffer[i*WORD_SIZE + 3];
+                W[i] = Conv_Word_To_32Int(&p->buffer[i*WORD_SIZE]);
         }
     }
 }
@@ -256,16 +247,26 @@ void Set_Pad(struct sha1_word_pointer *p, unsigned char *pad, uint64_t text_byte
  *
  **************************************************************************************************************************************/
 
-/* The function Conv_Int_To_Word takes a 32-bit integer argument and saves it as a four-byte char array 
+/* The function Conv_32Int_To_Word takes a 32-bit integer argument and saves it as a four-byte char array 
    starting at the position specified by the pointer a.                                               */
 
 
-void Conv_Int_To_Word(uint32_t i, char *a)
+void Conv_32Int_To_Word(uint32_t i, char *a)
 {
     a[0] = (i >> 24) & 255;
     a[1] = (i >> 16) & 255;
     a[2] = (i >> 8) & 255;
     a[3] = i & 255;
+}
+
+/* The function Conv_Word_To_32Int is the inverse of Conv_32Int_To_Word */
+
+uint32_t Conv_Word_To_32Int(unsigned char *a)
+{
+    return a[0] << 24 |
+           a[1] << 16 |
+           a[2] << 8 |
+           a[3];
 }
 
 
@@ -460,7 +461,7 @@ void SHA1_Compute(struct sha1_word_pointer *p, uint32_t *hash)
  * strings             char**          I       the pointer to the char* array containing the pointers to the char arrays 
  *                                             to be hashed as a concatenation
  * nr_of_strings       uint64_t        I       the number of char arrays in the concatenation
- * strings_byte_size   uint64_t*       I       pointer to the uint64_t array containing the byte size of each char array 
+ * strings_byte_size   uint64_t*       I       pointer to the uint64_t array containing the size in bytes of each char array 
  * hash                uint32_t*:      O       pointer to the uint32_t array where the resulting hash is to be stored
  *
  * RETURN VALUE : void
@@ -620,7 +621,7 @@ void HMAC_SHA1(char *key, unsigned int key_size, char *text, uint64_t text_size,
         SHA1(key, key_size, key_hash);
 
         for(i = 0; i < HASH_SIZE; i++)
-            Conv_Int_To_Word(key_hash[i], &key0[i * WORD_SIZE]);
+            Conv_32Int_To_Word(key_hash[i], &key0[i * WORD_SIZE]);
 
         for(i = HASH_SIZE * WORD_SIZE; i < BLOCK_SIZE; i++)
             key0[i] = 0;
@@ -652,7 +653,7 @@ void HMAC_SHA1(char *key, unsigned int key_size, char *text, uint64_t text_size,
     /* Convert the intermediate hash to a char array */
 
     for(i = 0; i < HASH_SIZE; i++)
-        Conv_Int_To_Word(hash1[i], &hash1_str[i * WORD_SIZE]);
+        Conv_32Int_To_Word(hash1[i], &hash1_str[i * WORD_SIZE]);
 
     /* Add the opad to the key, concatenate it with the intermediate hash and hash the result */
 
