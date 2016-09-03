@@ -1,7 +1,7 @@
 objects = test_sha1.o sha1.o
 
 tester	:	$(objects)
-			g++ -o tester $(objects) -lcppunit 
+			g++ -o tester $(objects) -static -lcppunit -Ofast 
 
 sha1.o	:	sha1.c sha1.h
 			g++ -c sha1.c

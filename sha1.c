@@ -3,7 +3,7 @@
  *
  * Copyright (c)  2016 Anders Nordenfelt
  *
- * DATED: 2016-08-25
+ * DATED: 2016-09-03
  *
  * CONTENT: Implements the SHA1 hash algorithm and its corresponding HMAC-SHA1 function in accordance with the 
  *          NIST specifications (FIPS PUB 180-4) and (FIPS PUB 198-1).
@@ -59,76 +59,71 @@ struct sha1_word_pointer
 
 /*-----------------------------------------------------------------------------------------------------------------------------*/
 
-/* The function Load_Buffer advances the position of the word-pointer one block and saves its corresponding 
-   integer representation. */
-
-
-void Load_Buffer(struct sha1_word_pointer *p, uint32_t* W)
+void Load_String_Buffer(struct sha1_word_pointer *p, uint32_t* W)
 {
     int i;              /* internal counter variable */
 
-    if (p->fp == NULL)  /* Perform the following for a string concatenation */
+    /* Fast track if the position is not close to the edge of the current string */
+    if(p->array_index < p->nr_of_strings && p->array_position + BLOCK_SIZE < p->strings_byte_size[p->array_index])
     {
-        /* Fast track if the position is not close to the edge of the current string */
+        for(i = 0; i < BLOCK_SIZE/WORD_SIZE; i++)
+            W[i] = Conv_Word_To_32Int((unsigned char*) &p->strings[p->array_index][p->array_position + WORD_SIZE*i]);
 
-        if(p->array_index < p->nr_of_strings && p->array_position + BLOCK_SIZE < p->strings_byte_size[p->array_index])
-        {
-            for(i = 0; i < BLOCK_SIZE/WORD_SIZE; i++)
-                W[i] = Conv_Word_To_32Int((unsigned char*) &p->strings[p->array_index][p->array_position + 4*i]);
-
-            p->array_position = p->array_position + BLOCK_SIZE;
-        }
-
-        else
-        {
-            i = 0;
-
-            do
-            {
-                /* If the pointer is in the pad, load the buffer with a byte from the pad */
-                if (p->is_in_pad == TRUE && p->pad_position < p->pad_byte_size)
-                {
-                    p->buffer[i] = p->pad[p->pad_position];
-                    p->pad_position++;
-                    i++;
-                }
-                /* If there are no more strings, jump into the pad */
-                else if (p->array_index == p->nr_of_strings)
-                {
-                    p->is_in_pad = TRUE;
-                    p->pad_position = 0;
-                }
-                /* If the pointer is at the end of a string, jump to the next string */
-                else if (p->array_position == p->strings_byte_size[p->array_index])
-                {
-                    p->array_index++;
-                    p->array_position = 0;
-                }
-                /* If the pointer is still within a string, load the buffer with a byte from the string */
-                else if (p->array_index < p->nr_of_strings && p->array_position < p->strings_byte_size[p->array_index])
-                {
-                    p->buffer[i] = (unsigned char) p->strings[p->array_index][p->array_position];
-                    p->array_position++;
-                    i++;
-                }
-                /* Else report error */
-                else
-                {
-                    printf("Error while loading SHA1 buffer\n");
-                    exit(EXIT_FAILURE); 
-                }
-            }while (i < BLOCK_SIZE);
-
-            /* Convert the buffer to 32-bit integers and store the result */
-            for(i = 0; i < BLOCK_SIZE/WORD_SIZE; i++)
-                W[i] = Conv_Word_To_32Int(&p->buffer[i*WORD_SIZE]);
-        }
+        p->array_position = p->array_position + BLOCK_SIZE;
     }
-    else /* Perform the following for a file */
-    {
-        /* Fast track if the position is not close to the pad */
 
-        if(p->file_position + BLOCK_SIZE < p->file_byte_size)
+    else
+    {
+        i = 0;
+
+        do
+        {
+            /* If the pointer is in the pad, load the buffer with a byte from the pad */
+            if (p->is_in_pad == TRUE && p->pad_position < p->pad_byte_size)
+            {
+                p->buffer[i] = p->pad[p->pad_position];
+                p->pad_position++;
+                i++;
+            }
+            /* If there are no more strings, jump into the pad */
+            else if (p->array_index == p->nr_of_strings)
+            {
+                p->is_in_pad = TRUE;
+                p->pad_position = 0;
+            }
+            /* If the pointer is at the end of a string, jump to the next string */
+            else if (p->array_position == p->strings_byte_size[p->array_index])
+            {
+                p->array_index++;
+                p->array_position = 0;
+            }
+            /* If the pointer is still within a string, load the buffer with a byte from the string */
+            else if (p->array_index < p->nr_of_strings && p->array_position < p->strings_byte_size[p->array_index])
+            {
+                p->buffer[i] = (unsigned char) p->strings[p->array_index][p->array_position];
+                p->array_position++;
+                i++;
+            }
+            /* Else report error */
+            else
+            {
+                printf("Error while loading SHA1 buffer\n");
+                exit(EXIT_FAILURE); 
+            }
+        }while (i < BLOCK_SIZE);
+
+        /* Convert the buffer to 32-bit integers and store the result */
+        for(i = 0; i < BLOCK_SIZE/WORD_SIZE; i++)
+            W[i] = Conv_Word_To_32Int(&p->buffer[i*WORD_SIZE]);
+    }
+}
+
+void Load_File_Buffer(struct sha1_word_pointer *p, uint32_t* W)
+{
+    int i;              /* internal counter variable */
+
+    /* Fast track if the position is not close to the pad */
+    if(p->file_position + BLOCK_SIZE < p->file_byte_size)
         {
             for(i = 0; i < BLOCK_SIZE/WORD_SIZE; i++)
                 W[i] = (unsigned char) fgetc(p->fp) << 24 |
@@ -139,45 +134,57 @@ void Load_Buffer(struct sha1_word_pointer *p, uint32_t* W)
             p->file_position = p->file_position + BLOCK_SIZE;
         }
 
-        else
+    else
+    {
+        i = 0;
+
+        do
         {
-            i = 0;
-
-            do
+            /* If the pointer is in the pad, load the buffer with a byte from the pad */
+            if (p->is_in_pad == TRUE && p->pad_position < p->pad_byte_size)
             {
-                /* If the pointer is in the pad, load the buffer with a byte from the pad */
-                if (p->is_in_pad == TRUE && p->pad_position < p->pad_byte_size)
-                {
-                    p->buffer[i] = p->pad[p->pad_position];
-                    p->pad_position++;
-                    i++;
-                }
-                /* If we have reached the end of the file, jump into the pad */
-                else if (p->file_position == p->file_byte_size)
-                {
-                    p->is_in_pad = TRUE;
-                    p->pad_position = 0;
-                }
-                /* If the pointer is still within the file, load the buffer with a byte from the file*/
-                else if ( p->file_position < p->file_byte_size)
-                {
-                    p->buffer[i] = (unsigned char) fgetc(p->fp);
-                    p->file_position++;
-                    i++;
-                }
-                /* Else report error */
-                else
-                {
-                    printf("Error while loading SHA1 buffer\n");
-                    exit(EXIT_FAILURE); 
-                }
-            }while (i < BLOCK_SIZE);
+                p->buffer[i] = p->pad[p->pad_position];
+                p->pad_position++;
+                i++;
+            }
+            /* If we have reached the end of the file, jump into the pad */
+            else if (p->file_position == p->file_byte_size)
+            {
+                p->is_in_pad = TRUE;
+                p->pad_position = 0;
+            }
+            /* If the pointer is still within the file, load the buffer with a byte from the file*/
+            else if ( p->file_position < p->file_byte_size)
+            {
+                p->buffer[i] = (unsigned char) fgetc(p->fp);
+                p->file_position++;
+                i++;
+            }
+            /* Else report error */
+            else
+            {
+                printf("Error while loading SHA1 buffer\n");
+                exit(EXIT_FAILURE); 
+            }
+        }while (i < BLOCK_SIZE);
 
-            /* Convert the buffer to 32-bit integers and store the result */
-            for(i = 0; i < BLOCK_SIZE/WORD_SIZE; i++)
-                W[i] = Conv_Word_To_32Int(&p->buffer[i*WORD_SIZE]);
-        }
+        /* Convert the buffer to 32-bit integers and store the result */
+        for(i = 0; i < BLOCK_SIZE/WORD_SIZE; i++)
+            W[i] = Conv_Word_To_32Int(&p->buffer[i*WORD_SIZE]);
     }
+}
+
+/* The function Load_Buffer advances the position of the word-pointer one block and saves its corresponding 
+   integer representation in the array W. */
+
+
+void Load_Buffer(struct sha1_word_pointer *p, uint32_t* W)
+{
+    if (p->fp == NULL)  
+        Load_String_Buffer(p, W);
+
+    else                
+        Load_File_Buffer(p, W);
 }
 
 /*------------------------------------------------------------------------------------------------------------------------------*/
@@ -283,7 +290,6 @@ uint32_t Conv_Word_To_32Int(unsigned char *a)
 
 void SHA1_Iterate_Hash(struct sha1_word_pointer *p, uint32_t *H)
 {
-
     #define Rot_Left(t, x) (((x) << t) | ((x) >> (32 - t)))
     #define Ch(x, y, z) ((x & y) ^ (~x & z))
     #define Parity(x, y, z) (x ^ y ^ z)
@@ -314,7 +320,6 @@ void SHA1_Iterate_Hash(struct sha1_word_pointer *p, uint32_t *H)
     }
 
     #define U(i)  (W[i] = Rot_Left(1, W[i-3] ^ W[i-8] ^ W[i-14] ^ W[i-16]), W[i])
-
 
     uint32_t W[80], a, b, c, d, e;
 

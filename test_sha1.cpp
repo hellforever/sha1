@@ -56,13 +56,14 @@ digest: 0x84983e44, 0x1c3bd26e, 0xbaae4aa1, 0xf95129e5, 0xe54670f1              
 
 void Test_SHA1::SHA1_Concat_test2()
 {
-    char msg1[] = {"abcdbcdecdefdefgefghfghig"};
-    char msg2[] = {"hijhijkijkljklmklmnlmnomnopnopq"};
-    char *msg[] = {msg1, msg2};
-    uint64_t msg_len[] = {strlen(msg1), strlen(msg2)};
+    char msg1[] = {""};
+    char msg2[] = {"abcdbcdecdefdefgefghfghig"};
+    char msg3[] = {"hijhijkijkljklmklmnlmnomnopnopq"};
+    char *msg[] = {msg1, msg2, msg3};
+    uint64_t msg_len[] = {strlen(msg1), strlen(msg2), strlen(msg3)};
 
     uint32_t digest[HASH_SIZE];
-    SHA1_Concat(msg, 2, msg_len, digest);
+    SHA1_Concat(msg, 3, msg_len, digest);
 
     uint32_t reference[] = {0x84983e44, 0x1c3bd26e, 0xbaae4aa1, 0xf95129e5, 0xe54670f1};
 
@@ -97,9 +98,9 @@ void Test_SHA1::SHA1_Concat_test3()
 
 /** -------------------------------------------------------------------------- 
 
-Test of SHA1_File with file "testfile.txt" containing the plain text "Now is the winter of our discontent"
+Test of SHA1_File with file "testfile.txt" containing the opening monologue of Richard III
 
-digest: 0x9b08c1d2, 0x42b9a4b2, 0x43b6df17, 0x3ffa21e8, 0x2868b119                         */
+digest: 0xc52c440c, 0xe2bbb52d, 0x6f0284a5, 0xe33c02eb, 0x68fdbf6c                         */
 
 void Test_SHA1::SHA1_File_test1()
 {
@@ -108,7 +109,7 @@ void Test_SHA1::SHA1_File_test1()
     uint32_t digest[HASH_SIZE];
     int exit_status = SHA1_File(filename, digest);
 
-    uint32_t reference[] = {0x9b08c1d2, 0x42b9a4b2, 0x43b6df17, 0x3ffa21e8, 0x2868b119};
+    uint32_t reference[] = {0xc52c440c, 0xe2bbb52d, 0x6f0284a5, 0xe33c02eb, 0x68fdbf6c};
 
     CPPUNIT_ASSERT(exit_status == EXIT_SUCCESS);
     
@@ -118,13 +119,34 @@ void Test_SHA1::SHA1_File_test1()
 }
 /** -------------------------------------------------------------------------- 
 
+Test of SHA1 with total text size larger than the block-size of 64 bytes
+
+text:   "abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu"
+
+digest: 0xa49b2446, 0xa02c645b, 0xf419f995, 0xb6709125, 0x3a04a259                     */
+
+void Test_SHA1::SHA1_test1()
+{
+    char msg[] = {"abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu"};
+
+    uint32_t digest[HASH_SIZE];
+    SHA1(msg, strlen(msg), digest);
+
+    uint32_t reference[] = {0xa49b2446, 0xa02c645b, 0xf419f995, 0xb6709125, 0x3a04a259};
+
+    for(int i = 0; i < HASH_SIZE; i++)
+        CPPUNIT_ASSERT(digest[i] == reference[i]);
+}
+
+/** -------------------------------------------------------------------------- 
+
 Test of SHA1 with long text
 
 text:   The letter 'a' repeated 1'000'000 times
 
 digest: 0x34aa973c, 0xd4c4daa4, 0xf61eeb2b, 0xdbad2731, 0x6534016f                     */
 
-void Test_SHA1::SHA1_test1()
+void Test_SHA1::SHA1_test2()
 {
     const unsigned int STRING_SIZE = 1000000;
     int i;

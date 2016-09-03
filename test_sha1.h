@@ -40,6 +40,7 @@ public:
     CPPUNIT_TEST( SHA1_Concat_test2 );
     CPPUNIT_TEST( SHA1_Concat_test3 );
     CPPUNIT_TEST( SHA1_test1 );
+    CPPUNIT_TEST( SHA1_test2 );
     CPPUNIT_TEST( SHA1_File_test1 );
     CPPUNIT_TEST( HMAC_SHA1_test1 );
     CPPUNIT_TEST( HMAC_SHA1_test2 );
@@ -50,6 +51,7 @@ public:
     void SHA1_Concat_test2();
     void SHA1_Concat_test3();
     void SHA1_test1();
+    void SHA1_test2();
     void SHA1_File_test1();
     void HMAC_SHA1_test1();
     void HMAC_SHA1_test2();
