@@ -3,7 +3,7 @@
 ##
 ##  Copyright (c)  2016  Anders Nordenfelt
 ##
-## 	Files: sha1.h, sha1.c, test_sha1.h, test_sha1.cpp, makefile, README.md, testfile.txt 
+## 	Files: sha1.h, sha1.c, shalib.c, shalib.h, test_sha1.h, test_sha1.cpp, makefile, README.md, testfile.txt 
 ##
 ##  The files are distributed under the terms of the GNU General Public License version 3, see <http://www.gnu.org/licenses/>.
 

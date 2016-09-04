@@ -10,18 +10,6 @@
 #ifndef __SHA1__
 #define __SHA1__
 
-struct sha1_word_pointer;
-
-void Load_Buffer(struct sha1_word_pointer *p, uint32_t *W);
-
-void Set_Zero(struct sha1_word_pointer *p);
-
-void Set_Pad(struct sha1_word_pointer *p, unsigned char *pad, uint64_t text_byte_size);
-
-void Conv_32Int_To_Word(uint32_t i, char *a);
-
-uint32_t Conv_Word_To_32Int(unsigned char *a);
-
 void SHA1_Iterate_Hash(struct sha1_word_pointer *p, uint32_t *H);
 
 void SHA1_Compute(struct sha1_word_pointer *p, uint32_t *hash);
