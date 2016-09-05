@@ -3,7 +3,7 @@
  *
  * Copyright (c)  2016 Anders Nordenfelt
  *
- * DATED: 2016-09-03
+ * DATED: 2016-09-04
  *
  * CONTENT: Implements the SHA1 hash algorithm and its corresponding HMAC-SHA1 function in accordance with the 
  *          NIST specifications (FIPS PUB 180-4) and (FIPS PUB 198-1).
@@ -25,146 +25,6 @@
 
 /************************************************************************************************************/
 
-/* The function SHA1_Iterate_Hash implements the SHA1 hash iteration function. 
-   See the NIST documentation (FIPS PUB 180-4) for details. 
-   This part of the code has been optimized for speed */
-
-
-void SHA1_Iterate_Hash(struct sha_word_pointer *p, uint32_t *H)
-{
-    #define Rot_Left(t, x) (((x) << t) | ((x) >> (32 - t)))
-    #define Ch(x, y, z) ((x & y) ^ (~x & z))
-    #define Parity(x, y, z) (x ^ y ^ z)
-    #define Maj(x, y, z) ((x & y) ^ (x & z) ^ (y & z))
-
-    #define F1(a, b, c, d, e, x)                                    \
-    {                                                               \
-        e += Rot_Left(5, a) + Ch(b, c, d) + 0x5a827999 + x;         \
-        b =  Rot_Left(30, b);                                       \
-    }
-
-    #define F2(a, b, c, d, e, x)                                    \
-    {                                                               \
-        e += Rot_Left(5, a) + Parity(b, c, d) + 0x6ed9eba1 + x;     \
-        b = Rot_Left(30, b);                                        \
-    }
-
-    #define F3(a, b, c, d, e, x)                                    \
-    {                                                               \
-        e += Rot_Left(5, a) + Maj(b, c, d) + 0x8f1bbcdc + x;        \
-        b = Rot_Left(30, b);                                        \
-    }
-
-    #define F4(a, b, c, d, e, x)                                    \
-    {                                                               \
-        e += Rot_Left(5, a) + Parity(b, c, d) + 0xca62c1d6 + x;     \
-        b = Rot_Left(30, b);                                        \
-    }
-
-    #define U(i)  (W[i] = Rot_Left(1, W[i-3] ^ W[i-8] ^ W[i-14] ^ W[i-16]), W[i])
-
-    uint32_t W[80], a, b, c, d, e;
-
-    Load_32Int_Buffer(p, W);
-
-    a = H[0];
-    b = H[1];
-    c = H[2];
-    d = H[3];
-    e = H[4];
-
-    F1(a, b, c, d, e, W[0]);
-    F1(e, a, b, c, d, W[1]);
-    F1(d, e, a, b, c, W[2]);
-    F1(c, d, e, a, b, W[3]);
-    F1(b, c, d, e, a, W[4]);
-    F1(a, b, c, d, e, W[5]);
-    F1(e, a, b, c, d, W[6]);
-    F1(d, e, a, b, c, W[7]);
-    F1(c, d, e, a, b, W[8]);
-    F1(b, c, d, e, a, W[9]);
-    F1(a, b, c, d, e, W[10]);
-    F1(e, a, b, c, d, W[11]);
-    F1(d, e, a, b, c, W[12]);
-    F1(c, d, e, a, b, W[13]);
-    F1(b, c, d, e, a, W[14]);
-    F1(a, b, c, d, e, W[15]);
-    F1(e, a, b, c, d, U(16));
-    F1(d, e, a, b, c, U(17));
-    F1(c, d, e, a, b, U(18));
-    F1(b, c, d, e, a, U(19));
-
-    F2(a, b, c, d, e, U(20));
-    F2(e, a, b, c, d, U(21));
-    F2(d, e, a, b, c, U(22));
-    F2(c, d, e, a, b, U(23));
-    F2(b, c, d, e, a, U(24));
-    F2(a, b, c, d, e, U(25));
-    F2(e, a, b, c, d, U(26));
-    F2(d, e, a, b, c, U(27));
-    F2(c, d, e, a, b, U(28));
-    F2(b, c, d, e, a, U(29));
-    F2(a, b, c, d, e, U(30));
-    F2(e, a, b, c, d, U(31));
-    F2(d, e, a, b, c, U(32));
-    F2(c, d, e, a, b, U(33));
-    F2(b, c, d, e, a, U(34));
-    F2(a, b, c, d, e, U(35));
-    F2(e, a, b, c, d, U(36));
-    F2(d, e, a, b, c, U(37));
-    F2(c, d, e, a, b, U(38));
-    F2(b, c, d, e, a, U(39));
-
-    F3(a, b, c, d, e, U(40));
-    F3(e, a, b, c, d, U(41));
-    F3(d, e, a, b, c, U(42));
-    F3(c, d, e, a, b, U(43));
-    F3(b, c, d, e, a, U(44));
-    F3(a, b, c, d, e, U(45));
-    F3(e, a, b, c, d, U(46));
-    F3(d, e, a, b, c, U(47));
-    F3(c, d, e, a, b, U(48));
-    F3(b, c, d, e, a, U(49));
-    F3(a, b, c, d, e, U(50));
-    F3(e, a, b, c, d, U(51));
-    F3(d, e, a, b, c, U(52));
-    F3(c, d, e, a, b, U(53));
-    F3(b, c, d, e, a, U(54));
-    F3(a, b, c, d, e, U(55));
-    F3(e, a, b, c, d, U(56));
-    F3(d, e, a, b, c, U(57));
-    F3(c, d, e, a, b, U(58));
-    F3(b, c, d, e, a, U(59));
-
-    F4(a, b, c, d, e, U(60));
-    F4(e, a, b, c, d, U(61));
-    F4(d, e, a, b, c, U(62));
-    F4(c, d, e, a, b, U(63));
-    F4(b, c, d, e, a, U(64));
-    F4(a, b, c, d, e, U(65));
-    F4(e, a, b, c, d, U(66));
-    F4(d, e, a, b, c, U(67));
-    F4(c, d, e, a, b, U(68));
-    F4(b, c, d, e, a, U(69));
-    F4(a, b, c, d, e, U(70));
-    F4(e, a, b, c, d, U(71));
-    F4(d, e, a, b, c, U(72));
-    F4(c, d, e, a, b, U(73));
-    F4(b, c, d, e, a, U(74));
-    F4(a, b, c, d, e, U(75));
-    F4(e, a, b, c, d, U(76));
-    F4(d, e, a, b, c, U(77));
-    F4(c, d, e, a, b, U(78));
-    F4(b, c, d, e, a, U(79));
-
-    H[0] += a;
-    H[1] += b;
-    H[2] += c;
-    H[3] += d;
-    H[4] += e;
-}
-
-/*------------------------------------------------------------------------------------------------------------------------------*/
 
 void SHA1_Compute(struct sha_word_pointer *p, uint32_t *hash)
 {
@@ -348,71 +208,7 @@ int SHA1_File(char *filename, uint32_t *hash)
 
 void HMAC_SHA1(char *key, unsigned int key_size, char *text, uint64_t text_size, uint32_t *digest)
 {
-    int i;                                  /* internal counter variable                                    */
-    char key0[BLOCK_SIZE];                  /* array to store the key adjusted to the block size            */
-    char key0_xor_ipad[BLOCK_SIZE];         /* array to store the key0 with the ipad added to it            */
-    char key0_xor_opad[BLOCK_SIZE];         /* array to store the key0 with the opad added to it            */
-    uint32_t hash1[HASH_SIZE];              /* array to store the intermediate hash as integers             */
-    char hash1_str[HASH_SIZE * WORD_SIZE];  /* array to store the intermediate hash as a string             */
-    char *concat1[2];                       /* pointers to the first concatenation                          */
-    char *concat2[2];                       /* pointers to the second concatenation                         */ 
-    uint64_t concat1_byte_size[2];          /* the sizes of the strings forming the first concatenation     */
-    uint64_t concat2_byte_size[2];          /* the sizes of the strings forming the second concatenation    */
-
-
-    /* If the key is longer than the block size, hash the key and pad the result with zeros */
-
-    if (key_size > BLOCK_SIZE)
-    {
-        uint32_t key_hash[HASH_SIZE];       /* array to store the hash of the key */
-        SHA1(key, key_size, key_hash);
-
-        for(i = 0; i < HASH_SIZE; i++)
-            Conv_32Int_To_Word(key_hash[i], &key0[i * WORD_SIZE]);
-
-        for(i = HASH_SIZE * WORD_SIZE; i < BLOCK_SIZE; i++)
-            key0[i] = 0;
-    }
-
-    /* Otherwise pad the key with zeros */
-
-    if (key_size <= BLOCK_SIZE)
-    {
-        for(i = 0; i < key_size; i++)
-            key0[i] = key[i];
-
-        for(i = key_size; i < BLOCK_SIZE; i++)
-            key0[i] = 0;
-    }
-
-    /* Add the ipad to the key, concatenate it with the text and hash the result */ 
-
-    for(i = 0; i < BLOCK_SIZE; i++)
-        key0_xor_ipad[i] = key0[i] ^ 0x36;
-
-    concat1[0] = key0_xor_ipad;
-    concat1[1] = text;
-    concat1_byte_size[0] = BLOCK_SIZE;
-    concat1_byte_size[1] = text_size;
-
-    SHA1_Concat(concat1, 2, concat1_byte_size, hash1);
-
-    /* Convert the intermediate hash to a char array */
-
-    for(i = 0; i < HASH_SIZE; i++)
-        Conv_32Int_To_Word(hash1[i], &hash1_str[i * WORD_SIZE]);
-
-    /* Add the opad to the key, concatenate it with the intermediate hash and hash the result */
-
-    for(i = 0; i < BLOCK_SIZE; i++)
-        key0_xor_opad[i] = key0[i] ^ 0x5c;
-
-    concat2[0] = key0_xor_opad;
-    concat2[1] = hash1_str;
-    concat2_byte_size[0] = BLOCK_SIZE;
-    concat2_byte_size[1] = HASH_SIZE * WORD_SIZE;
-
-    SHA1_Concat(concat2, 2, concat2_byte_size, digest);
+    HMAC32(key, key_size, text, text_size, digest, SHA1, SHA1_Concat, HASH_SIZE);
 }
 
 

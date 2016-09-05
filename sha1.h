@@ -10,7 +10,6 @@
 #ifndef __SHA1__
 #define __SHA1__
 
-void SHA1_Iterate_Hash(struct sha1_word_pointer *p, uint32_t *H);
 
 void SHA1_Compute(struct sha1_word_pointer *p, uint32_t *hash);
 

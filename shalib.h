@@ -3,7 +3,7 @@
  *
  * Copyright (c) 2016 Anders Nordenfelt
  *
- * CONTENT: Declares the functions defined in shalib.c
+ * CONTENT: Declares the sha_word_pointer and the functions defined in shalib.c
  *
  **************************************************************************************************************************************/
 
@@ -63,5 +63,16 @@ void Load_String_64Int_Buffer(struct sha_word_pointer *p, uint64_t* W);
 void Load_File_64Int_Buffer(struct sha_word_pointer *p, uint64_t* W);
 
 void Load_64Int_Buffer(struct sha_word_pointer *p, uint64_t* W);
+
+
+void SHA1_Iterate_Hash(struct sha_word_pointer *p, uint32_t *H);
+
+void SHA256_Iterate_Hash(struct sha_word_pointer *p, uint32_t *H);
+
+void SHA512_Iterate_Hash(struct sha_word_pointer *p, uint64_t *H);
+
+void HMAC32(char *key, unsigned int key_size, char *text, uint64_t text_size, uint32_t *digest, void (*SHA)(char *text, uint64_t text_byte_size, uint32_t *hash), void (*SHA_Concat)(char **strings, uint64_t nr_of_strings, uint64_t *strings_byte_size, uint32_t *hash), unsigned int HASH_SIZE);
+
+void HMAC64(char *key, unsigned int key_size, char *text, uint64_t text_size, uint64_t *digest, void (*SHA)(char *text, uint64_t text_byte_size, uint64_t *hash), void (*SHA_Concat)(char **strings, uint64_t nr_of_strings, uint64_t *strings_byte_size, uint64_t *hash), unsigned int HASH_SIZE);
 
 #endif
