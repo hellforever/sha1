@@ -38,6 +38,8 @@ struct sha_word_pointer
 
 void Set_Zero(struct sha_word_pointer *p);
 
+void Set_Pad(struct sha_word_pointer *p, unsigned char *pad, uint64_t text_byte_size, unsigned int BLOCK_SIZE);
+
 
 void Conv_32Int_To_Word(uint32_t i, char *a);
 

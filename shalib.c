@@ -3,7 +3,7 @@
  *
  * Copyright (c)  2016 Anders Nordenfelt
  *
- * DATED: 2016-09-04
+ * DATED: 2016-09-05
  *
  * CONTENT: Defines methods common to the SHA-algorithms
  *
@@ -40,46 +40,11 @@ void Set_Zero(struct sha_word_pointer *p)
     p->file_position = 0;
 }
 
-
-
-/***************************************************************************************************************************************
- * 
- *  SECTION: 32-BIT WORD POINTER METHODS
- *
- **************************************************************************************************************************************/
-
-#define BLOCK_SIZE 64
-#define WORD_SIZE 4
-
-
-
-/* The function Conv_32Int_To_Word takes a 32-bit integer argument and saves it as a four-byte char array 
-   starting at the position specified by the pointer a.                                               */
-
-void Conv_32Int_To_Word(uint32_t i, char *a)
-{
-    a[0] = (i >> 24) & 255;
-    a[1] = (i >> 16) & 255;
-    a[2] = (i >> 8) & 255;
-    a[3] = i & 255;
-}
-
-/* The function Conv_Word_To_32Int is the inverse of Conv_32Int_To_Word */
-
-uint32_t Conv_Word_To_32Int(unsigned char *a)
-{
-    return a[0] << 24 |
-           a[1] << 16 |
-           a[2] << 8 |
-           a[3];
-}
-
 /*----------------------------------------------------------------------------------------------------*/
 
-/* The function Set_64Byte_Pad prepares and sets the pad for 64 byte blocks
-   Note that pointer with enough allocated memory for the pad must be provided  */
+/* The function Set_Pad prepares and sets the pad                     */
 
-void Set_64Byte_Pad(struct sha_word_pointer *p, unsigned char *pad, uint64_t text_byte_size)
+void Set_Pad(struct sha_word_pointer *p, unsigned char *pad, uint64_t text_byte_size, unsigned int BLOCK_SIZE)
 {
     int i;                                              /* internal counter variable                               */
     unsigned int nr_of_zeros;                           /* number of zero bytes in the pad                         */ 
@@ -88,7 +53,11 @@ void Set_64Byte_Pad(struct sha_word_pointer *p, unsigned char *pad, uint64_t tex
 
     /* Calculate the number of zeros in the pad and the pad size */
 
-    nr_of_zeros = (BLOCK_SIZE - ((text_byte_size + 9) % BLOCK_SIZE)) % BLOCK_SIZE; 
+    if (BLOCK_SIZE == 64) 
+        nr_of_zeros = (BLOCK_SIZE - ((text_byte_size + 9) % BLOCK_SIZE)) % BLOCK_SIZE;
+    else if (BLOCK_SIZE == 128)
+         nr_of_zeros = ((BLOCK_SIZE - ((text_byte_size + 17) % BLOCK_SIZE)) % BLOCK_SIZE) + 8;
+
     pad_byte_size = 9 + nr_of_zeros;
 
     /* Set the first byte in the pad equal to the delimiter 10000000b */
@@ -113,6 +82,47 @@ void Set_64Byte_Pad(struct sha_word_pointer *p, unsigned char *pad, uint64_t tex
     p->pad_byte_size = pad_byte_size;
     p->is_in_pad = FALSE;
     p->tot_byte_size = text_byte_size + pad_byte_size;
+}
+
+/***************************************************************************************************************************************
+ * 
+ *  SECTION: 32-BIT WORD POINTER METHODS
+ *
+ **************************************************************************************************************************************/
+
+#define BLOCK_SIZE 64
+#define WORD_SIZE 4
+
+
+/* The function Conv_32Int_To_Word takes a 32-bit integer argument and saves it as a four-byte char array 
+   starting at the position specified by the pointer a.                                               */
+
+void Conv_32Int_To_Word(uint32_t i, char *a)
+{
+    a[0] = (i >> 24) & 255;
+    a[1] = (i >> 16) & 255;
+    a[2] = (i >> 8) & 255;
+    a[3] = i & 255;
+}
+
+/* The function Conv_Word_To_32Int is the inverse of Conv_32Int_To_Word */
+
+uint32_t Conv_Word_To_32Int(unsigned char *a)
+{
+    return a[0] << 24 |
+           a[1] << 16 |
+           a[2] << 8 |
+           a[3];
+}
+
+/*-------------------------------------------------------------------------------------------------------------------*/
+
+/* The function Set_64Byte_Pad sets the pad for 64 byte blocks
+   Note that pointer with enough allocated memory for the pad must be provided  */
+
+void Set_64Byte_Pad(struct sha_word_pointer *p, unsigned char *pad, uint64_t text_byte_size)
+{
+    Set_Pad(p, pad, text_byte_size, BLOCK_SIZE);
 }
 
 
@@ -252,7 +262,6 @@ void Load_32Int_Buffer(struct sha_word_pointer *p, uint32_t* W)
 
 
 
-
 /***************************************************************************************************************************************
  * 
  *  SECTION: 64-BIT WORD POINTER METHODS
@@ -299,37 +308,10 @@ uint64_t Conv_Word_To_64Int(unsigned char *a)
 
 void Set_128Byte_Pad(struct sha_word_pointer *p, unsigned char *pad, uint64_t text_byte_size)
 {
-    int i;                                              /* internal counter variable                               */
-    unsigned int nr_of_zeros;                           /* number of zero bytes in the pad                         */ 
-    unsigned int pad_byte_size;                         /* the size of the pad                                     */
-    uint64_t text_bit_size;                             /* the size in BITS of the text                            */
-
-    nr_of_zeros = (BLOCK_SIZE - ((text_byte_size + 17) % BLOCK_SIZE)) % BLOCK_SIZE; 
-    pad_byte_size = 17 + nr_of_zeros;
-
-    /* Set the first byte in the pad equal to the delimiter 10000000b */
-
-    pad[0] = DELIMITER;                                 
-
-    /* Insert the zeros in the pad */
-
-    for (i = 1; i <= nr_of_zeros + 8; i++) 
-        pad[i] = 0;                                     
-
-    /* Insert an 8-byte rep. of the bit-size at the end of the pad */
-
-    text_bit_size = 8*text_byte_size;      
-    for (i = 0; i < 8; i++)
-        pad[pad_byte_size - i - 1] = (text_bit_size >> i*8) & 255;    
-
-    /* Put the pad and related data in the word pointer */
-
-    p->pad = pad;
-    p->pad_position = 0;
-    p->pad_byte_size = pad_byte_size;
-    p->is_in_pad = FALSE;
-    p->tot_byte_size = text_byte_size + pad_byte_size;
+    Set_Pad(p, pad, text_byte_size, BLOCK_SIZE);
 }
+
+
 
 /*-------------------------------------------------------------------------------------------------------------------*/
 
